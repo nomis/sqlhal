@@ -155,8 +155,8 @@ int db_list_init(const char *list) {
 	}
 	PQclear(res);
 
-	name = malloc((4 + strlen(list)) * sizeof(char));
-	sprintf(name, "%s_add", list);
+	name = malloc((10 + strlen(list)) * sizeof(char));
+	sprintf(name, "list_%s_add", list);
 
 #define SQL "INSERT INTO %s (word) VALUES($1)"
 	sql = malloc((strlen(SQL) + strlen(list)) * sizeof(char));
@@ -169,8 +169,8 @@ int db_list_init(const char *list) {
 	if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
 	PQclear(res);
 
-	name = malloc((4 + strlen(list)) * sizeof(char));
-	sprintf(name, "%s_get", list);
+	name = malloc((10 + strlen(list)) * sizeof(char));
+	sprintf(name, "list_%s_get", list);
 
 #define SQL "SELECT word FROM %s WHERE word = $1"
 	sql = malloc((strlen(SQL) + strlen(list)) * sizeof(char));
@@ -199,8 +199,8 @@ int db_list_add(const char *list, word_t *word) {
 
 	if (list == NULL || word == NULL) return -EINVAL;
 
-	name = malloc((4 + strlen(list)) * sizeof(char));
-	sprintf(name, "%s_add", list);
+	name = malloc((10 + strlen(list)) * sizeof(char));
+	sprintf(name, "list_%s_add", list);
 
 	param[0] = tmp;
 	sprintf(tmp, "%lu", (unsigned long)*word);
@@ -226,8 +226,8 @@ int db_list_contains(const char *list, word_t *word) {
 
 	if (list == NULL || word == NULL) return -EINVAL;
 
-	name = malloc((4 + strlen(list)) * sizeof(char));
-	sprintf(name, "%s_get", list);
+	name = malloc((10 + strlen(list)) * sizeof(char));
+	sprintf(name, "list_%s_get", list);
 
 	param[0] = tmp;
 	sprintf(tmp, "%lu", (unsigned long)*word);
