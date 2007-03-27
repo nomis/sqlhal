@@ -78,11 +78,13 @@ fail:
 	return OK;
 }
 
-void db_disconnect() {
-	if (conn != NULL) {
-		PQfinish(conn);
-		conn = NULL;
-	}
+int db_disconnect() {
+	if (conn == NULL)
+		return -EDB;
+
+	PQfinish(conn);
+	conn = NULL;
+	return OK;
 }
 
 int db_begin() {

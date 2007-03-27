@@ -1,7 +1,7 @@
 typedef void db_hand;
 
 int db_connect();
-void db_disconnect();
+int db_disconnect();
 
 int db_begin();
 int db_commit();
