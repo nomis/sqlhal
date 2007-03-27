@@ -8,25 +8,25 @@
 #include "db.h"
 #include "output.h"
 
-int do_list(const char *personality, const char *prefix, const char *type) {
+int do_list(const char *base, const char *prefix, const char *type) {
 	char *filename;
 	int ret;
 
 	filename = malloc((strlen(prefix) + 5) * sizeof(char));
 	sprintf(filename, "%s.%s", prefix, type);
 
-	ret = initialise_list(personality, type, filename);
+	ret = initialise_list(base, type, filename);
 	return ret;
 }
 
-int do_map(const char *personality, const char *prefix, const char *type) {
+int do_map(const char *base, const char *prefix, const char *type) {
 	char *filename;
 	int ret;
 
 	filename = malloc((strlen(prefix) + 5) * sizeof(char));
 	sprintf(filename, "%s.%s", prefix, type);
 
-	ret = initialise_map(personality, type, filename);
+	ret = initialise_map(base, type, filename);
 	return ret;
 }
 
@@ -37,7 +37,7 @@ int main(int argc, char *argv[]) {
 
 	if (argc < 2 || argc > 3) {
 		printf("Brain loader\n");
-		printf("Usage: %s <personality> [filename prefix]\n", argv[0]);
+		printf("Usage: %s <base> [filename prefix]\n", argv[0]);
 		return 1;
 	}
 
