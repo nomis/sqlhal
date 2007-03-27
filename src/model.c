@@ -58,6 +58,7 @@ int load_dict(FILE *fd, uint32_t *dict_size, word_t **dict_words) {
 
 	*dict_size = size;
 	*dict_words = malloc(sizeof(word_t) * size);
+	if (*dict_words == NULL) return -ENOMEM;
 
 	for (i = 0; i < size; i++) {
 		if (!fread(&length, sizeof(length), 1, fd)) return -EIO;
