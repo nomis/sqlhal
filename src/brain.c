@@ -6,6 +6,7 @@
 #include "dict.h"
 #include "types.h"
 #include "db.h"
+#include "model.h"
 #include "output.h"
 
 int do_list(const char *base, const char *prefix, const char *type) {
@@ -27,6 +28,17 @@ int do_map(const char *base, const char *prefix, const char *type) {
 	sprintf(filename, "%s.%s", prefix, type);
 
 	ret = initialise_map(base, type, filename);
+	return ret;
+}
+
+int do_brain(const char *name, const char *prefix, const char *type) {
+	char *filename;
+	int ret;
+
+	filename = malloc((strlen(prefix) + 5) * sizeof(char));
+	sprintf(filename, "%s.%s", prefix, type);
+
+	ret = load_brain(name, filename);
 	return ret;
 }
 
@@ -70,6 +82,11 @@ int main(int argc, char *argv[]) {
 
 	state = "do_map swp";
 	do_map(argv[1], prefix, "swp");
+	if (ret) log_warn("brain", ret, state);
+	else log_info("brain", ret, state);
+
+	state = "do_brain brn";
+	do_brain(argv[1], prefix, "brn");
 	if (ret) log_warn("brain", ret, state);
 	else log_info("brain", ret, state);
 

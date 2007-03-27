@@ -8,7 +8,7 @@ all: $(BIN)
 clean:
 	rm -f *.o $(BIN)
 
-BRAIN=brain.o dict.o console.o db_$(DB).o
+BRAIN=brain.o dict.o model.o console.o db_$(DB).o
 ../bin/brain: $(BRAIN)
 	$(CC) -o $@ $(BRAIN) -lpq
 
@@ -18,3 +18,4 @@ brain.o: dict.h output.h
 cli.o: output.h
 dict.o: db.h $(STD_H)
 db_postgres.o: db.h $(STD_H)
+model.o: db.h dbtree.h $(STD_H)

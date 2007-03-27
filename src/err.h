@@ -3,3 +3,4 @@
 #define EIO 2
 #define EDB 3
 #define ENOTFOUND 4
+#define EFAULT 5

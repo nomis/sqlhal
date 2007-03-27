@@ -23,7 +23,3 @@ int db_map_zap(db_hand **hand);                             /* drops table */
 int db_map_add(db_hand **hand, word_t *key, word_t *value); /* add key (does not exist) */
 int db_map_get(db_hand **hand, word_t *key, word_t *value); /* return -ENOTFOUND if key does not exist */
 int db_map_del(db_hand **hand, word_t *key, word_t *value); /* delete key (exists) */
-
-int db_model_create(const char *name);
-int db_model_delete(const char *name);
-int db_model_exists(const char *name);
