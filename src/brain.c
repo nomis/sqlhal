@@ -21,6 +21,20 @@ void do_list(const char *personality, const char *prefix, const char *type) {
 	}
 }
 
+void do_map(const char *personality, const char *prefix, const char *type) {
+	char *filename;
+	int ret;
+
+	filename = malloc((strlen(prefix) + 5) * sizeof(char));
+	sprintf(filename, "%s.%s", prefix, type);
+
+	ret = initialise_map(personality, type, filename);
+	if (ret) {
+		printf("initialise_map failed for %s (err %d)\n", filename, ret);
+		exit(1);
+	}
+}
+
 int main(int argc, char *argv[]) {
 	char *prefix;
 
@@ -37,7 +51,7 @@ int main(int argc, char *argv[]) {
 	do_list(argv[1], prefix, "aux");
 	do_list(argv[1], prefix, "ban");
 	do_list(argv[1], prefix, "grt");
-//	do_list2("swp");
+	do_map(argv[1], prefix, "swp");
 
 	db_commit();
 	db_disconnect();
