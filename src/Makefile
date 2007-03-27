@@ -8,7 +8,7 @@ all: $(BIN)
 clean:
 	rm -f *.o $(BIN)
 
-BRAIN=brain.o dict.o cli.o db_$(DB).o
+BRAIN=brain.o dict.o console.o db_$(DB).o
 ../bin/brain: $(BRAIN)
 	$(CC) -o $@ $(BRAIN) -lpq
 
