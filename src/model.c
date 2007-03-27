@@ -46,7 +46,7 @@ int load_tree(FILE *fd, int mode, word_t *dict, db_hand **hand, db_tree **tree) 
 	return -EFAULT;
 }
 
-int load_dict(FILE *fd, uint32_t *dict_size, char ***dict_data, word_t **dict_words) {
+int load_dict(FILE *fd, uint32_t *dict_size, word_t **dict_words) {
 	uint32_t size;
 	uint8_t length;
 	int ret;
@@ -57,7 +57,6 @@ int load_dict(FILE *fd, uint32_t *dict_size, char ***dict_data, word_t **dict_wo
 	if (!fread(&size, sizeof(size), 1, fd)) return -EIO;
 
 	*dict_size = size;
-	*dict_data = malloc(sizeof(char*) * size);
 	*dict_words = malloc(sizeof(word_t) * size);
 
 	for (i = 0; i < size; i++) {
@@ -65,9 +64,6 @@ int load_dict(FILE *fd, uint32_t *dict_size, char ***dict_data, word_t **dict_wo
 
 		tmp[length] = 0;
 		if (fread(tmp, sizeof(char), length, fd) != length) return -EIO;
-
-		(*dict_data)[i] = malloc(sizeof(char) * strlen(tmp));
-		strcpy((*dict_data)[i], tmp);
 
 		ret = db_word_get(tmp, &word);
 		if (ret == -ENOTFOUND)
@@ -80,16 +76,10 @@ int load_dict(FILE *fd, uint32_t *dict_size, char ***dict_data, word_t **dict_wo
 	return OK;
 }
 
-void free_dict(uint32_t *dict_size, char ***dict_data, word_t **dict_words) {
-	uint32_t i;
-
-	for (i = 0; i < *dict_size; i++)
-		free((*dict_data)[i]);
-	free(*dict_data);
+void free_dict(uint32_t *dict_size, word_t **dict_words) {
 	free(*dict_words);
 
 	*dict_size = 0;
-	*dict_data = NULL;
 	*dict_words = NULL;
 }
 
@@ -103,7 +93,6 @@ int load_brain(const char *name, const char *filename) {
 	number_t order;
 	uint8_t tmp8;
 	uint32_t dict_size;
-	char **dict_data;
 	word_t *dict_words;
 
 	if (name == NULL || filename == NULL) return -EINVAL;
@@ -142,7 +131,7 @@ int load_brain(const char *name, const char *filename) {
 	ret = load_tree(fd, LOAD_IGNORE, NULL, NULL, NULL); /* backward */
 	if (ret) goto fail;
 
-	ret = load_dict(fd, &dict_size, &dict_data, &dict_words);
+	ret = load_dict(fd, &dict_size, &dict_words);
 	if (ret) goto fail;
 
 	/* Read most of the file again... */
@@ -159,7 +148,7 @@ int load_brain(const char *name, const char *filename) {
 	ret = db_model_free(&hand);
 #endif
 
-	free_dict(&dict_size, &dict_data, &dict_words);
+	free_dict(&dict_size, &dict_words);
 
 fail:
 	fclose(fd);
