@@ -4,3 +4,4 @@
 #define EDB 3
 #define ENOTFOUND 4
 #define EFAULT 5
+#define ENOMEM 6

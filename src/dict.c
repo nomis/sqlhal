@@ -21,7 +21,9 @@ int initialise_list(const char *base, const char *type, const char *filename) {
 	if (fd == NULL) return -EIO;
 
 	list = malloc((strlen(base) + strlen(type) + 2) * sizeof(char));
-	sprintf(list, "%s_%s", base, type);
+	if (list == NULL) return -ENOMEM;
+	if (sprintf(list, "%s_%s", base, type) <= 0) return -EFAULT;
+
 	ret = db_list_init(list, &hand);
 	if (ret) goto fail;
 
@@ -67,7 +69,9 @@ int initialise_map(const char *base, const char *type, const char *filename) {
 	if (fd == NULL) return -EIO;
 
 	map = malloc((strlen(base) + strlen(type) + 2) * sizeof(char));
-	sprintf(map, "%s_%s", base, type);
+	if (map == NULL) return -ENOMEM;
+	if (sprintf(map, "%s_%s", base, type) <= 0) return -EFAULT;
+
 	ret = db_map_init(map, &hand);
 	if (ret) goto fail;
 

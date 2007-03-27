@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "dict.h"
+#include "err.h"
 #include "types.h"
 #include "db.h"
 #include "model.h"
@@ -14,7 +15,8 @@ int do_list(const char *base, const char *prefix, const char *type) {
 	int ret;
 
 	filename = malloc((strlen(prefix) + 5) * sizeof(char));
-	sprintf(filename, "%s.%s", prefix, type);
+	if (filename == NULL) return -ENOMEM;
+	if (sprintf(filename, "%s.%s", prefix, type) <= 0) return -EFAULT;
 
 	ret = initialise_list(base, type, filename);
 	return ret;
@@ -25,18 +27,20 @@ int do_map(const char *base, const char *prefix, const char *type) {
 	int ret;
 
 	filename = malloc((strlen(prefix) + 5) * sizeof(char));
-	sprintf(filename, "%s.%s", prefix, type);
+	if (filename == NULL) return -ENOMEM;
+	if (sprintf(filename, "%s.%s", prefix, type) <= 0) return -EFAULT;
 
 	ret = initialise_map(base, type, filename);
 	return ret;
 }
 
-int do_brain(const char *name, const char *prefix, const char *type) {
+int do_brain(const char *name, const char *prefix) {
 	char *filename;
 	int ret;
 
 	filename = malloc((strlen(prefix) + 5) * sizeof(char));
-	sprintf(filename, "%s.%s", prefix, type);
+	if (filename == NULL) return -ENOMEM;
+	if (sprintf(filename, "%s.brn", prefix) <= 0) return -EFAULT;
 
 	ret = load_brain(name, filename);
 	return ret;
@@ -85,8 +89,8 @@ int main(int argc, char *argv[]) {
 	if (ret) log_warn("brain", ret, state);
 	else log_info("brain", ret, state);
 
-	state = "do_brain brn";
-	do_brain(argv[1], prefix, "brn");
+	state = "do_brain";
+	do_brain(argv[1], prefix);
 	if (ret) log_warn("brain", ret, state);
 	else log_info("brain", ret, state);
 
