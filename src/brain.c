@@ -31,11 +31,15 @@ int main(int argc, char *argv[]) {
 
 	prefix = argv[argc - 1];
 
+	db_connect();
+	db_begin();
+
 	do_list(argv[1], prefix, "aux");
 	do_list(argv[1], prefix, "ban");
 	do_list(argv[1], prefix, "grt");
 //	do_list2("swp");
 
+	db_commit();
 	db_disconnect();
 
 	return 0;

@@ -1,3 +1,5 @@
+/* TODO: avoid having to use atol and sprintf with integers... */
+
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -8,6 +10,13 @@
 #include "err.h"
 #include "types.h"
 #include "db.h"
+#include "output.h"
+
+struct db_list_postgres {
+	PGconn *conn;
+	char *add;
+	char *get;
+};
 
 static PGconn *conn = NULL;
 
@@ -19,7 +28,7 @@ int db_connect() {
 			return -EDB;
 
 		if (PQstatus(conn) != CONNECTION_OK) {
-			printf("DB: %d %s\n", PQstatus(conn), PQerrorMessage(conn));
+			log_error("DB", PQstatus(conn), PQerrorMessage(conn));
 			PQfinish(conn);
 			conn = NULL;
 		} else {
@@ -30,11 +39,11 @@ int db_connect() {
 			if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
 			PQclear(res);
 
-			res = PQexecPrepared(conn, "table_exists", 1, words, NULL, NULL, 0);
+			res = PQexecPrepared(conn, "table_exists", 1, words, NULL, NULL, 1);
 			if (PQresultStatus(res) != PGRES_TUPLES_OK) goto fail;
 			if (PQntuples(res) != 1) {
 				PQclear(res);
-				res = PQexec(conn, "CREATE TABLE words (id SERIAL UNIQUE, word TEXT, PRIMARY KEY (word))");
+				res = PQexec(conn, "CREATE TABLE words (id SERIAL UNIQUE, word TEXT, added TIMESTAMP NOT NULL DEFAULT NOW(), PRIMARY KEY (word))");
 				if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
 			}
 			PQclear(res);
@@ -55,7 +64,7 @@ int db_connect() {
 
 fail:
 			if (res != NULL) {
-				printf("db_connect: %d %s\n", PQresultStatus(res), PQresultErrorMessage(res));
+				log_error("db_connect", PQresultStatus(res), PQresultErrorMessage(res));
 				PQclear(res);
 				PQfinish(conn);
 				conn = NULL;
@@ -76,6 +85,54 @@ void db_disconnect() {
 	}
 }
 
+int db_begin() {
+	PGresult *res;
+
+	if (db_connect()) return -EDB;
+
+	res = PQexec(conn, "BEGIN");
+	if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
+	PQclear(res);
+
+	return OK;
+
+fail:
+	PQclear(res);
+	return -EDB;
+}
+
+int db_commit() {
+	PGresult *res;
+
+	if (db_connect()) return -EDB;
+
+	res = PQexec(conn, "COMMIT");
+	if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
+	PQclear(res);
+
+	return OK;
+
+fail:
+	PQclear(res);
+	return -EDB;
+}
+
+int db_rollback() {
+	PGresult *res;
+
+	if (db_connect()) return -EDB;
+
+	res = PQexec(conn, "ROLLBACK");
+	if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
+	PQclear(res);
+
+	return OK;
+
+fail:
+	PQclear(res);
+	return -EDB;
+}
+
 int db_word_add(const char *word, word_t *ref) {
 	PGresult *res;
 	const char *param[1];
@@ -84,7 +141,7 @@ int db_word_add(const char *word, word_t *ref) {
 	if (db_connect()) return -EDB;
 
 	param[0] = word;
-	res = PQexecPrepared(conn, "word_add", 1, param, NULL, NULL, 0);
+	res = PQexecPrepared(conn, "word_add", 1, param, NULL, NULL, 1);
 	if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
 	PQclear(res);
 
@@ -98,7 +155,7 @@ int db_word_add(const char *word, word_t *ref) {
 	return OK;
 
 fail:
-	printf("db_word_add: %d %s\n", PQresultStatus(res), PQresultErrorMessage(res));
+	log_error("db_word_add\n", PQresultStatus(res), PQresultErrorMessage(res));
 	PQclear(res);
 	return -EDB;
 }
@@ -121,7 +178,7 @@ int db_word_get(const char *word, word_t *ref) {
 	return OK;
 
 fail:
-	printf("db_word_get: %d %s\n", PQresultStatus(res), PQresultErrorMessage(res));
+	log_error("db_word_get", PQresultStatus(res), PQresultErrorMessage(res));
 	PQclear(res);
 	return -EDB;
 
@@ -130,16 +187,18 @@ end:
 	return -ENOTFOUND;
 }
 
-int db_list_init(const char *list) {
+int db_list_init(const char *list, db_list **hand) {
 	PGresult *res;
 	const char *param[1];
-	char *sql, *name;
+	char *sql;
+	struct db_list_postgres *hand_p;
 
 	if (list == NULL) return -EINVAL;
 	if (db_connect()) return -EDB;
 
+	*hand = NULL;
 	param[0] = list;
-	res = PQexecPrepared(conn, "table_exists", 1, param, NULL, NULL, 0);
+	res = PQexecPrepared(conn, "table_exists", 1, param, NULL, NULL, 1);
 	if (PQresultStatus(res) != PGRES_TUPLES_OK) goto fail;
 	if (PQntuples(res) != 1) {
 		PQclear(res);
@@ -155,30 +214,30 @@ int db_list_init(const char *list) {
 	}
 	PQclear(res);
 
-	name = malloc((10 + strlen(list)) * sizeof(char));
-	sprintf(name, "list_%s_add", list);
+	*hand = malloc(sizeof(struct db_list_postgres));
+	hand_p = *hand;
+	hand_p->conn = conn;
+	hand_p->add = malloc((10 + strlen(list)) * sizeof(char));
+	sprintf(hand_p->add, "list_%s_add", list);
+	hand_p->get = malloc((10 + strlen(list)) * sizeof(char));
+	sprintf(hand_p->get, "list_%s_get", list);
 
 #define SQL "INSERT INTO %s (word) VALUES($1)"
 	sql = malloc((strlen(SQL) + strlen(list)) * sizeof(char));
 	sprintf(sql, SQL, list);
 #undef SQL
 
-	res = PQprepare(conn, name, sql, 1, NULL);
-	free(name);
+	res = PQprepare(conn, hand_p->add, sql, 1, NULL);
 	free(sql);
 	if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
 	PQclear(res);
-
-	name = malloc((10 + strlen(list)) * sizeof(char));
-	sprintf(name, "list_%s_get", list);
 
 #define SQL "SELECT word FROM %s WHERE word = $1"
 	sql = malloc((strlen(SQL) + strlen(list)) * sizeof(char));
 	sprintf(sql, SQL, list);
 #undef SQL
 
-	res = PQprepare(conn, name, sql, 1, NULL);
-	free(name);
+	res = PQprepare(conn, hand_p->get, sql, 1, NULL);
 	free(sql);
 	if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
 	PQclear(res);
@@ -186,54 +245,98 @@ int db_list_init(const char *list) {
 	return OK;
 
 fail:
-	printf("db_list_init: %d %s\n", PQresultStatus(res), PQresultErrorMessage(res));
+	if (hand != NULL) {
+		free(hand_p->get);
+		free(hand_p->add);
+		free(*hand);
+		*hand = NULL;
+	}
+	log_error("db_list_init", PQresultStatus(res), PQresultErrorMessage(res));
 	PQclear(res);
 	return -EDB;
 }
 
-int db_list_add(const char *list, word_t *word) {
+int db_list_free(db_list **hand) {
+	struct db_list_postgres *hand_p;
+
+	if (hand == NULL || *hand == NULL) return -EINVAL;
+	hand_p = *hand;
+	if (db_connect()) return -EDB;
+
+	if (hand_p->conn != NULL && hand_p->conn == conn) {
+		PGresult *res;
+		char *sql;
+
+#define SQL "DEALLOCATE PREPARE %s"
+		sql = malloc((strlen(SQL) + strlen(hand_p->add)) * sizeof(char));
+		sprintf(sql, SQL, hand_p->add);
+		res = PQexec(conn, sql);
+		free(sql);
+		PQclear(res);
+
+		sql = malloc((strlen(SQL) + strlen(hand_p->get)) * sizeof(char));
+		sprintf(sql, SQL, hand_p->get);
+		res = PQexec(conn, sql);
+		free(sql);
+		PQclear(res);
+#undef SQL
+	}
+
+	free(hand_p->add);
+	free(hand_p->get);
+	free(*hand);
+	*hand = NULL;
+
+	return OK;
+}
+
+int db_list_add(db_list **hand, word_t *word) {
 	PGresult *res;
 	const char *param[1];
-	char *name;
+	struct db_list_postgres *hand_p;
 	static char tmp[128];
 
-	if (list == NULL || word == NULL) return -EINVAL;
-
-	name = malloc((10 + strlen(list)) * sizeof(char));
-	sprintf(name, "list_%s_add", list);
+	if (hand == NULL || *hand == NULL || word == NULL) return -EINVAL;
+	hand_p = *hand;
+	if (db_connect() || hand_p->conn != conn) {
+		hand_p->conn = NULL;
+		db_list_free(hand);
+		return -EDB;
+	}
 
 	param[0] = tmp;
 	sprintf(tmp, "%lu", (unsigned long)*word);
 
-	res = PQexecPrepared(conn, name, 1, param, NULL, NULL, 0);
-	free(name);
+	res = PQexecPrepared(conn, hand_p->add, 1, param, NULL, NULL, 0);
 	if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
 	PQclear(res);
 
 	return OK;
 
 fail:
-	printf("db_list_add: %d %s\n", PQresultStatus(res), PQresultErrorMessage(res));
+	log_error("db_list_add", PQresultStatus(res), PQresultErrorMessage(res));
 	PQclear(res);
 	return -EDB;
 }
 
-int db_list_contains(const char *list, word_t *word) {
+int db_list_contains(db_list **hand, word_t *word) {
 	PGresult *res;
 	const char *param[1];
-	char *name;
+	struct db_list_postgres *hand_p;
 	static char tmp[128];
 
-	if (list == NULL || word == NULL) return -EINVAL;
-
-	name = malloc((10 + strlen(list)) * sizeof(char));
-	sprintf(name, "list_%s_get", list);
+	if (hand == NULL || *hand == NULL || word == NULL) return -EINVAL;
+	hand_p = *hand;
+	if (db_connect() || hand_p->conn != conn) {
+		hand_p->conn = NULL;
+		db_list_free(hand);
+		return -EDB;
+	}
 
 	param[0] = tmp;
 	sprintf(tmp, "%lu", (unsigned long)*word);
 
-	res = PQexecPrepared(conn, name, 1, param, NULL, NULL, 0);
-	free(name);
+	res = PQexecPrepared(conn, hand_p->get, 1, param, NULL, NULL, 0);
 	if (PQresultStatus(res) != PGRES_TUPLES_OK) goto fail;
 	if (PQntuples(res) == 0) goto not_found;
 
@@ -242,7 +345,7 @@ int db_list_contains(const char *list, word_t *word) {
 	return OK;
 
 fail:
-	printf("db_list_add: %d %s\n", PQresultStatus(res), PQresultErrorMessage(res));
+	log_error("db_list_add", PQresultStatus(res), PQresultErrorMessage(res));
 	PQclear(res);
 	return -EDB;
 

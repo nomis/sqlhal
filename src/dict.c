@@ -14,6 +14,7 @@ int initialise_list(const char *personality, const char *type, const char *filen
 	char *string;
 	char *list;
 	int ret = OK;
+	db_list *hand;
 
 	if (personality == NULL || type == NULL || filename == NULL) return -EINVAL;
 
@@ -22,7 +23,7 @@ int initialise_list(const char *personality, const char *type, const char *filen
 
 	list = malloc((strlen(personality) + strlen(type) + 2) * sizeof(char));
 	sprintf(list, "%s_%s", personality, type);
-	ret = db_list_init(list);
+	ret = db_list_init(list, &hand);
 	if (ret) goto fail;
 
 	while (!feof(fd)) {
@@ -38,19 +39,16 @@ int initialise_list(const char *personality, const char *type, const char *filen
 				ret = db_word_add(string, &word);
 			if (ret) goto fail;
 
-			ret = db_list_contains(list, &word);
+			ret = db_list_contains(&hand, &word);
 			if (ret == -ENOTFOUND)
-				ret = db_list_add(list, &word);
+				ret = db_list_add(&hand, &word);
 			if (ret) goto fail;
 		}
 	}
 
-	goto end;
+	ret = db_list_free(&hand);
 
 fail:
-	printf("err: %d\n", ret);
-
-end:
 	fclose(fd);
 	return ret;
 }

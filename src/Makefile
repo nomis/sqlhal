@@ -1,5 +1,5 @@
 DB=postgres
-CFLAGS=-Wall -g -O0
+CFLAGS=-Wall -Werror -g -O0
 
 STD_H=err.h types.h
 BIN=../bin/brain
@@ -8,12 +8,13 @@ all: $(BIN)
 clean:
 	rm -f *.o $(BIN)
 
-BRAIN=brain.o dict.o db_$(DB).o
+BRAIN=brain.o dict.o cli.o db_$(DB).o
 ../bin/brain: $(BRAIN)
 	$(CC) -o $@ $(BRAIN) -lpq
 
 db.h: types.h
 
-brain.c: dict.h
-dict.c: db.h $(STD_H)
-db_postgres.c: db.h $(STD_H)
+brain.o: dict.h output.h
+cli.o: output.h
+dict.o: db.h $(STD_H)
+db_postgres.o: db.h $(STD_H)
