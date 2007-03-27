@@ -18,7 +18,7 @@ struct db_hand_postgres {
 	char *get;
 };
 
-static PGconn *conn = NULL;
+PGconn *conn = NULL;
 
 int db_connect() {
 	if (conn == NULL) {
@@ -296,7 +296,7 @@ int db_list_add(db_hand **hand, word_t *word) {
 	PGresult *res;
 	const char *param[1];
 	struct db_hand_postgres *hand_p;
-	static char tmp[128];
+	char tmp[128];
 
 	if (hand == NULL || *hand == NULL || word == NULL) return -EINVAL;
 	hand_p = *hand;
@@ -325,7 +325,7 @@ int db_list_contains(db_hand **hand, word_t *word) {
 	PGresult *res;
 	const char *param[1];
 	struct db_hand_postgres *hand_p;
-	static char tmp[128];
+	char tmp[128];
 
 	if (hand == NULL || *hand == NULL || word == NULL) return -EINVAL;
 	hand_p = *hand;
@@ -463,8 +463,8 @@ int db_map_add(db_hand **hand, word_t *key, word_t *value) {
 	PGresult *res;
 	const char *param[2];
 	struct db_hand_postgres *hand_p;
-	static char tmp[128];
-	static char tmp2[128];
+	char tmp[128];
+	char tmp2[128];
 
 	if (hand == NULL || *hand == NULL || key == NULL || value == NULL) return -EINVAL;
 	hand_p = *hand;
@@ -495,7 +495,7 @@ int db_map_get(db_hand **hand, word_t *key, word_t *value) {
 	PGresult *res;
 	const char *param[1];
 	struct db_hand_postgres *hand_p;
-	static char tmp[128];
+	char tmp[128];
 
 	if (hand == NULL || *hand == NULL || key == NULL || value == NULL) return -EINVAL;
 	hand_p = *hand;
