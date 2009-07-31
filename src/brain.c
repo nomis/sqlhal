@@ -49,6 +49,7 @@ int do_brain(const char *name, const char *prefix) {
 int main(int argc, char *argv[]) {
 	char *prefix;
 	int ret;
+	int fail = 0;
 	char *state;
 
 	if (argc < 2 || argc > 3) {
@@ -71,33 +72,40 @@ int main(int argc, char *argv[]) {
 
 	state = "do_list aux";
 	ret = do_list(argv[1], prefix, "aux");
-	if (ret) log_warn("brain", ret, state);
+	if (ret) { log_warn("brain", ret, state); fail = 1; }
 	else log_info("brain", ret, state);
 
 	state = "do_list ban";
 	ret = do_list(argv[1], prefix, "ban");
-	if (ret) log_warn("brain", ret, state);
+	if (ret) { log_warn("brain", ret, state); fail = 1; }
 	else log_info("brain", ret, state);
 
 	state = "do_list grt";
 	ret = do_list(argv[1], prefix, "grt");
-	if (ret) log_warn("brain", ret, state);
+	if (ret) { log_warn("brain", ret, state); fail = 1; }
 	else log_info("brain", ret, state);
 
 	state = "do_map swp";
-	do_map(argv[1], prefix, "swp");
-	if (ret) log_warn("brain", ret, state);
+	ret = do_map(argv[1], prefix, "swp");
+	if (ret) { log_warn("brain", ret, state); fail = 1; }
 	else log_info("brain", ret, state);
 
 	state = "do_brain";
-	do_brain(argv[1], prefix);
-	if (ret) log_warn("brain", ret, state);
+	ret = do_brain(argv[1], prefix);
+	if (ret) { log_warn("brain", ret, state); fail = 1; }
 	else log_info("brain", ret, state);
 
-	state = "db_commit";
-	ret = db_commit();
-	if (ret) goto fail;
-	else log_info("brain", ret, state);
+	if (fail) {
+		state = "db_rollback";
+		ret = db_rollback();
+		if (ret) goto fail;
+		else log_info("brain", ret, state);
+	} else {
+		state = "db_commit";
+		ret = db_commit();
+		if (ret) goto fail;
+		else log_info("brain", ret, state);
+	}
 
 	state = "db_disconnect";
 	ret = db_disconnect();
