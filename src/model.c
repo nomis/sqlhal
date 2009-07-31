@@ -10,12 +10,15 @@
 #include "output.h"
 
 #define COOKIE "MegaHALv8"
-#define LOAD_IGNORE 0
-#define LOAD_FORWARD 1
-#define LOAD_BACKWARD 2
-#define LOAD_APPEND 3
 
-int load_tree(FILE *fd, int mode, word_t *dict, db_hand **hand, db_tree **tree) {
+enum load_mode {
+	LOAD_IGNORE,
+	LOAD_FORWARD,
+	LOAD_BACKWARD,
+	LOAD_APPEND
+};
+
+int load_tree(FILE *fd, enum load_mode mode, word_t *dict, db_hand **hand, db_tree **tree) {
 	uint16_t symbol;
 	uint32_t usage;
 	uint16_t count;
