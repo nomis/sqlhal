@@ -69,9 +69,7 @@ int load_dict(FILE *fd, uint32_t *dict_size, word_t **dict_words) {
 		tmp[length] = 0;
 		if (fread(tmp, sizeof(char), length, fd) != length) return -EIO;
 
-		ret = db_word_get(tmp, &word);
-		if (ret == -ENOTFOUND)
-			ret = db_word_add(tmp, &word);
+		ret = db_word_use(tmp, &word);
 		if (ret) return ret;
 
 		(*dict_words)[i] = word;

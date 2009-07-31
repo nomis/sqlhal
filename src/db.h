@@ -9,6 +9,7 @@ int db_rollback();
 
 int db_word_add(const char *word, word_t *ref); /* add word (does not exist) */
 int db_word_get(const char *word, word_t *ref); /* return -ENOTFOUND if word does not exist */
+int db_word_use(const char *word, word_t *ref); /* get or add word */
 
 int db_list_init(const char *list, db_hand **hand); /* create table, prepare statements */
 int db_list_free(db_hand **hand);                   /* deallocates prepared statements */
