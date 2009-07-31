@@ -34,14 +34,16 @@ int load_tree(FILE *fd, enum load_mode mode, word_t *dict, db_hand **hand, db_tr
 	if (branch == 0) return OK;
 
 	switch (mode) {
+		case LOAD_FORWARD:
+		case LOAD_BACKWARD:
+			if (dict == NULL || hand == NULL || tree == NULL)
+				return -EINVAL;
 		case LOAD_IGNORE:
 			for (i = 0; i < branch; i++) {
 				ret = load_tree(fd, mode, dict, hand, tree);
 				if (ret) return ret;
 			}
 			return OK;
-		case LOAD_FORWARD:
-		case LOAD_BACKWARD:
 		case LOAD_APPEND:
 			break;
 	}
