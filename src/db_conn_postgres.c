@@ -129,6 +129,22 @@ fail:
 	return -EDB;
 }
 
+int db_hand_init(db_hand **hand) {
+	struct db_hand_postgres *hand_p;
+	int ret = OK;
+
+	if (hand == NULL || *hand != NULL) return -EINVAL;
+
+    *hand = malloc(sizeof(struct db_hand_postgres));
+    if (*hand == NULL) return -ENOMEM;
+    hand_p = *hand;
+
+	hand_p->get = NULL;
+	hand_p->add = NULL;
+
+	return ret;
+}
+
 int db_hand_free(db_hand **hand) {
 	struct db_hand_postgres *hand_p;
 	int ret = OK;
@@ -136,7 +152,7 @@ int db_hand_free(db_hand **hand) {
 	if (hand == NULL || *hand == NULL) return -EINVAL;
 	hand_p = *hand;
 
-	if (hand_p->conn != NULL && hand_p->conn == conn) {
+	{
 		PGresult *res;
 		char *sql;
 

@@ -41,11 +41,10 @@ int db_list_init(const char *list, db_hand **hand) {
 	}
 	PQclear(res);
 
-	*hand = malloc(sizeof(struct db_hand_postgres));
-	if (*hand == NULL) return -ENOMEM;
+	ret = db_hand_init(hand);
+	if (ret) return ret;
 	hand_p = *hand;
-	hand_p->conn = conn;
-	hand_p->add = hand_p->get = NULL;
+
 	hand_p->add = malloc((10 + strlen(list)) * sizeof(char));
 	if (hand_p->add == NULL) { ret = -ENOMEM; goto fail_free; }
 	if (sprintf(hand_p->add, "list_%s_add", list) <= 0) { ret = -ENOMEM; goto fail_free; }
@@ -103,8 +102,7 @@ int db_list_add(db_hand **hand, word_t *word) {
 
 	if (hand == NULL || *hand == NULL || word == NULL) return -EINVAL;
 	hand_p = *hand;
-	if (db_connect() || hand_p->conn != conn) {
-		hand_p->conn = NULL;
+	if (db_connect()) {
 		db_list_free(hand);
 		return -EDB;
 	}
@@ -138,8 +136,7 @@ int db_list_contains(db_hand **hand, word_t *word) {
 
 	if (hand == NULL || *hand == NULL || word == NULL) return -EINVAL;
 	hand_p = *hand;
-	if (db_connect() || hand_p->conn != conn) {
-		hand_p->conn = NULL;
+	if (db_connect()) {
 		db_list_free(hand);
 		return -EDB;
 	}
