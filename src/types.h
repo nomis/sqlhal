@@ -1,4 +1,4 @@
-typedef uint32_t word_t;
-typedef uint32_t tree_t;
+typedef uint64_t word_t;
+typedef uint64_t tree_t;
 
-typedef uint32_t number_t;
+typedef uint64_t number_t;

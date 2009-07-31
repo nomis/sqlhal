@@ -1,5 +1,3 @@
-/* TODO: avoid having to use atol and sprintf with integers... */
-
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -151,7 +149,13 @@ int db_word_add(const char *word, word_t *ref) {
 	if (PQresultStatus(res) != PGRES_TUPLES_OK) goto fail;
 	if (PQntuples(res) != 1) goto fail;
 
-	*ref = atol(PQgetvalue(res, 0, 0));
+	if (sizeof(word_t) == sizeof(unsigned long int)) {
+		*ref = strtoul(PQgetvalue(res, 0, 0), NULL, 10);
+	} else if (sizeof(word_t) == sizeof(unsigned long long int)) {
+		*ref = strtoull(PQgetvalue(res, 0, 0), NULL, 10);
+	} else {
+		return -EFAULT;
+	}
 	PQclear(res);
 
 	return OK;
@@ -174,7 +178,13 @@ int db_word_get(const char *word, word_t *ref) {
 	if (PQresultStatus(res) != PGRES_TUPLES_OK) goto fail;
 	if (PQntuples(res) == 0) goto end;
 
-	*ref = atol(PQgetvalue(res, 0, 0));
+	if (sizeof(word_t) == sizeof(unsigned long int)) {
+		*ref = strtoul(PQgetvalue(res, 0, 0), NULL, 10);
+	} else if (sizeof(word_t) == sizeof(unsigned long long int)) {
+		*ref = strtoull(PQgetvalue(res, 0, 0), NULL, 10);
+	} else {
+		return -EFAULT;
+	}
 	PQclear(res);
 
 	return OK;
@@ -335,7 +345,13 @@ int db_list_add(db_hand **hand, word_t *word) {
 	}
 
 	param[0] = tmp;
-	if (sprintf(tmp, "%lu", (unsigned long)*word) <= 0) return -EFAULT;
+	if (sizeof(word_t) == sizeof(unsigned long int)) {
+		if (sprintf(tmp, "%lu", (unsigned long int)*word) <= 0) return -EFAULT;
+	} else if (sizeof(word_t) == sizeof(unsigned long long int)) {
+		if (sprintf(tmp, "%llu", (unsigned long long int)*word) <= 0) return -EFAULT;
+	} else {
+		return -EFAULT;
+	}
 
 	res = PQexecPrepared(conn, hand_p->add, 1, param, NULL, NULL, 0);
 	if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
@@ -364,7 +380,13 @@ int db_list_contains(db_hand **hand, word_t *word) {
 	}
 
 	param[0] = tmp;
-	if (sprintf(tmp, "%lu", (unsigned long)*word) <= 0) return -EFAULT;
+	if (sizeof(word_t) == sizeof(unsigned long int)) {
+		if (sprintf(tmp, "%lu", (unsigned long int)*word) <= 0) return -EFAULT;
+	} else if (sizeof(word_t) == sizeof(unsigned long long int)) {
+		if (sprintf(tmp, "%llu", (unsigned long long int)*word) <= 0) return -EFAULT;
+	} else {
+		return -EFAULT;
+	}
 
 	res = PQexecPrepared(conn, hand_p->get, 1, param, NULL, NULL, 0);
 	if (PQresultStatus(res) != PGRES_TUPLES_OK) goto fail;
@@ -484,8 +506,15 @@ int db_map_add(db_hand **hand, word_t *key, word_t *value) {
 
 	param[0] = tmp;
 	param[1] = tmp2;
-	if (sprintf(tmp, "%lu", (unsigned long)*key) <= 0) return -EFAULT;
-	if (sprintf(tmp2, "%lu", (unsigned long)*value) <= 0) return -EFAULT;
+	if (sizeof(word_t) == sizeof(unsigned long int)) {
+		if (sprintf(tmp, "%lu", (unsigned long int)*key) <= 0) return -EFAULT;
+		if (sprintf(tmp2, "%lu", (unsigned long int)*value) <= 0) return -EFAULT;
+	} else if (sizeof(word_t) == sizeof(unsigned long long int)) {
+		if (sprintf(tmp, "%llu", (unsigned long long int)*key) <= 0) return -EFAULT;
+		if (sprintf(tmp2, "%llu", (unsigned long long int)*value) <= 0) return -EFAULT;
+	} else {
+		return -EFAULT;
+	}
 
 	res = PQexecPrepared(conn, hand_p->add, 2, param, NULL, NULL, 0);
 	if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
@@ -514,14 +543,25 @@ int db_map_get(db_hand **hand, word_t *key, word_t *value) {
 	}
 
 	param[0] = tmp;
-	if (sprintf(tmp, "%lu", (unsigned long)*key) <= 0) return -EFAULT;
+	if (sizeof(word_t) == sizeof(unsigned long int)) {
+		if (sprintf(tmp, "%lu", (unsigned long int)*key) <= 0) return -EFAULT;
+	} else if (sizeof(word_t) == sizeof(unsigned long long int)) {
+		if (sprintf(tmp, "%llu", (unsigned long long int)*key) <= 0) return -EFAULT;
+	} else {
+		return -EFAULT;
+	}
 
 	res = PQexecPrepared(conn, hand_p->get, 1, param, NULL, NULL, 0);
 	if (PQresultStatus(res) != PGRES_TUPLES_OK) goto fail;
 	if (PQntuples(res) == 0) goto not_found;
 
-	*value = atol(PQgetvalue(res, 0, 0));
-
+	if (sizeof(word_t) == sizeof(unsigned long int)) {
+		*value = strtoul(PQgetvalue(res, 0, 0), NULL, 10);
+	} else if (sizeof(word_t) == sizeof(unsigned long long int)) {
+		*value = strtoull(PQgetvalue(res, 0, 0), NULL, 10);
+	} else {
+		return -EFAULT;
+	}
 	PQclear(res);
 
 	return OK;
