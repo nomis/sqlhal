@@ -21,6 +21,7 @@ int db_list_del(db_hand **hand, word_t *word);      /* delete word (exists) */
 int db_map_init(const char *map, db_hand **hand);           /* create table, prepare statements */
 int db_map_free(db_hand **hand);                            /* deallocates prepared statements */
 int db_map_zap(db_hand **hand);                             /* drops table */
-int db_map_add(db_hand **hand, word_t *key, word_t *value); /* add key (does not exist) */
 int db_map_get(db_hand **hand, word_t *key, word_t *value); /* return -ENOTFOUND if key does not exist */
+int db_map_put(db_hand **hand, word_t *key, word_t *value); /* add key (does not exist) */
+int db_map_use(db_hand **hand, word_t *key, word_t *value); /* get or put word */
 int db_map_del(db_hand **hand, word_t *key, word_t *value); /* delete key (exists) */

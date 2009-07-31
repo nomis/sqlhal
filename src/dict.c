@@ -35,9 +35,7 @@ int initialise_list(const char *base, const char *type, const char *filename) {
 		if ((string != NULL) && (strlen(string) > 0)) {
 			word_t word;
 
-			ret = db_word_get(string, &word);
-			if (ret == -ENOTFOUND)
-				ret = db_word_add(string, &word);
+			ret = db_word_use(string, &word);
 			if (ret) goto fail;
 
 			ret = db_list_contains(&hand, &word);
@@ -85,19 +83,13 @@ int initialise_map(const char *base, const char *type, const char *filename) {
 		if ((from != NULL) && (strlen(from) > 0) && (to != NULL) && (strlen(to) > 0)) {
 			word_t key, value;
 
-			ret = db_word_get(from, &key);
-			if (ret == -ENOTFOUND)
-				ret = db_word_add(from, &key);
+			ret = db_word_use(from, &key);
 			if (ret) goto fail;
 
-			ret = db_word_get(to, &value);
-			if (ret == -ENOTFOUND)
-				ret = db_word_add(to, &value);
+			ret = db_word_use(to, &value);
 			if (ret) goto fail;
 
-			ret = db_map_get(&hand, &key, &value);
-			if (ret == -ENOTFOUND)
-				ret = db_map_add(&hand, &key, &value);
+			ret = db_map_use(&hand, &key, &value);
 			if (ret) goto fail;
 		}
 	}

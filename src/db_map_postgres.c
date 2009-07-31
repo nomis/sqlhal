@@ -47,7 +47,7 @@ int db_map_init(const char *map, db_hand **hand) {
 
 	hand_p->add = malloc((9 + strlen(map)) * sizeof(char));
 	if (hand_p->add == NULL) { ret = -ENOMEM; goto fail_free; }
-	if (sprintf(hand_p->add, "map_%s_add", map) <= 0) { ret = -ENOMEM; goto fail_free; }
+	if (sprintf(hand_p->add, "map_%s_put", map) <= 0) { ret = -ENOMEM; goto fail_free; }
 	hand_p->get = malloc((9 + strlen(map)) * sizeof(char));
 	if (hand_p->get == NULL) { ret = -ENOMEM; goto fail_free; }
 	if (sprintf(hand_p->get, "map_%s_get", map) <= 0) { ret = -ENOMEM; goto fail_free; }
@@ -94,7 +94,7 @@ int db_map_free(db_hand **hand) {
 	return db_hand_free(hand);
 }
 
-int db_map_add(db_hand **hand, word_t *key, word_t *value) {
+int db_map_put(db_hand **hand, word_t *key, word_t *value) {
 	PGresult *res;
 	const char *param[2];
 	struct db_hand_postgres *hand_p;
@@ -127,7 +127,7 @@ int db_map_add(db_hand **hand, word_t *key, word_t *value) {
 	return OK;
 
 fail:
-	log_error("db_map_add", PQresultStatus(res), PQresultErrorMessage(res));
+	log_error("db_map_put", PQresultStatus(res), PQresultErrorMessage(res));
 	PQclear(res);
 	return -EDB;
 }
@@ -170,7 +170,7 @@ int db_map_get(db_hand **hand, word_t *key, word_t *value) {
 	return OK;
 
 fail:
-	log_error("db_map_contains", PQresultStatus(res), PQresultErrorMessage(res));
+	log_error("db_map_get", PQresultStatus(res), PQresultErrorMessage(res));
 	PQclear(res);
 	return -EDB;
 
