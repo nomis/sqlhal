@@ -6,7 +6,7 @@ typedef struct {
 
 int db_model_init(const char *name, db_hand **hand);
 int db_model_free(db_hand **hand);
-int db_model_zap(db_hand **hand);
+int db_model_zap(const char *name);
 
 int db_model_get_order(db_hand **hand, number_t *order);
 int db_model_set_order(db_hand **hand, number_t order);

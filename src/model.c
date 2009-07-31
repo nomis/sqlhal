@@ -103,7 +103,7 @@ int load_brain(const char *name, const char *filename) {
 	if (fd == NULL) return -EIO;
 
 #if 0
-	ret = db_model_zap(name, &hand);
+	ret = db_model_zap(name);
 	if (ret && ret != -ENOTFOUND) goto fail;
 
 	ret = db_model_init(name, &hand);
