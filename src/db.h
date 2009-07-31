@@ -1,11 +1,11 @@
 typedef void db_hand;
 
-int db_connect();    /* creates words table */
-int db_disconnect();
+int db_connect(void);    /* creates words table */
+int db_disconnect(void);
 
-int db_begin();
-int db_commit();
-int db_rollback();
+int db_begin(void);
+int db_commit(void);
+int db_rollback(void);
 
 int db_word_add(const char *word, word_t *ref); /* add word (does not exist) */
 int db_word_get(const char *word, word_t *ref); /* return -ENOTFOUND if word does not exist */
