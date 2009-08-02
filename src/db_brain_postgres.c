@@ -40,7 +40,7 @@ int db_brain_add(const char *brain, brain_t *ref) {
 	return OK;
 
 fail:
-	log_error("db_brain_add\n", PQresultStatus(res), PQresultErrorMessage(res));
+	log_error("db_brain_add", PQresultStatus(res), PQresultErrorMessage(res));
 	PQclear(res);
 	return -EDB;
 }

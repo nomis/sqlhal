@@ -95,8 +95,28 @@ fail:
 }
 
 int db_disconnect(void) {
+	PGresult *res;
+
 	if (conn == NULL)
 		return -EDB;
+
+	res = PQexec(conn, "DEALLOCATE PREPARE brain_add");
+	PQclear(res);
+
+	res = PQexec(conn, "DEALLOCATE PREPARE brain_add_id");
+	PQclear(res);
+
+	res = PQexec(conn, "DEALLOCATE PREPARE brain_get");
+	PQclear(res);
+
+	res = PQexec(conn, "DEALLOCATE PREPARE word_add");
+	PQclear(res);
+
+	res = PQexec(conn, "DEALLOCATE PREPARE word_add_id");
+	PQclear(res);
+
+	res = PQexec(conn, "DEALLOCATE PREPARE word_get");
+	PQclear(res);
 
 	PQfinish(conn);
 	conn = NULL;
@@ -182,28 +202,32 @@ int db_hand_free(db_hand **hand) {
 		ret = db_connect();
 
 #define SQL "DEALLOCATE PREPARE %s"
-		if (!ret) {
-			sql = malloc((strlen(SQL) + strlen(hand_p->add)) * sizeof(char));
-			if (sql == NULL) ret = -ENOMEM;
-			else if (sprintf(sql, SQL, hand_p->add) <= 0) { ret = -EFAULT; free(sql); }
+		if (hand_p->add != NULL) {
+			if (!ret) {
+				sql = malloc((strlen(SQL) + strlen(hand_p->add)) * sizeof(char));
+				if (sql == NULL) ret = -ENOMEM;
+				else if (sprintf(sql, SQL, hand_p->add) <= 0) { ret = -EFAULT; free(sql); }
+			}
+
+			if (!ret) {
+				res = PQexec(conn, sql);
+				free(sql);
+				PQclear(res);
+			}
 		}
 
-		if (!ret) {
-			res = PQexec(conn, sql);
-			free(sql);
-			PQclear(res);
-		}
+		if (hand_p->get != NULL) {
+			if (!ret) {
+				sql = malloc((strlen(SQL) + strlen(hand_p->get)) * sizeof(char));
+				if (sql == NULL) ret = -ENOMEM;
+				else if (sprintf(sql, SQL, hand_p->get) <= 0) { ret = -EFAULT; free(sql); }
+			}
 
-		if (!ret) {
-			sql = malloc((strlen(SQL) + strlen(hand_p->get)) * sizeof(char));
-			if (sql == NULL) ret = -ENOMEM;
-			else if (sprintf(sql, SQL, hand_p->get) <= 0) { ret = -EFAULT; free(sql); }
-		}
-
-		if (!ret) {
-			res = PQexec(conn, sql);
-			free(sql);
-			PQclear(res);
+			if (!ret) {
+				res = PQexec(conn, sql);
+				free(sql);
+				PQclear(res);
+			}
 		}
 #undef SQL
 	}

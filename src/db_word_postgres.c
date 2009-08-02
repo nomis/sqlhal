@@ -40,7 +40,7 @@ int db_word_add(const char *word, word_t *ref) {
 	return OK;
 
 fail:
-	log_error("db_word_add\n", PQresultStatus(res), PQresultErrorMessage(res));
+	log_error("db_word_add", PQresultStatus(res), PQresultErrorMessage(res));
 	PQclear(res);
 	return -EDB;
 }
