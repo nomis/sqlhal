@@ -4,6 +4,15 @@
 #include "types.h"
 #include "db.h"
 
+int db_brain_use(const char *brain, word_t *ref) {
+	int ret;
+
+	ret = db_brain_get(brain, ref);
+	if (ret == -ENOTFOUND)
+		ret = db_brain_add(brain, ref);
+	return ret;
+}
+
 int db_word_use(const char *word, word_t *ref) {
 	int ret;
 

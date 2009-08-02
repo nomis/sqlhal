@@ -1,8 +1,10 @@
 #include <libpq-fe.h>
 
 struct db_hand_postgres {
+	char *brain;
 	char *add;
 	char *get;
+	char *zap;
 };
 
 PGconn *conn;

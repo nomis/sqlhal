@@ -7,24 +7,26 @@
 #include "types.h"
 #include "db.h"
 
-int initialise_list(const char *base, const char *type, const char *filename) {
+int load_list(const char *name, const char *type, const char *filename) {
 	FILE *fd;
 	char buffer[1024];
 	char *string;
-	char *list;
 	int ret = OK;
 	db_hand *hand;
+	brain_t brain;
 
-	if (base == NULL || type == NULL || filename == NULL) return -EINVAL;
+	if (name == NULL || type == NULL || filename == NULL) return -EINVAL;
 
 	fd = fopen(filename, "r");
 	if (fd == NULL) return -EIO;
 
-	list = malloc((strlen(base) + strlen(type) + 2) * sizeof(char));
-	if (list == NULL) return -ENOMEM;
-	if (sprintf(list, "%s_%s", base, type) <= 0) return -EFAULT;
+	ret = db_brain_use(name, &brain);
+	if (ret) goto fail;
 
-	ret = db_list_init(list, &hand);
+	ret = db_list_init(type, &hand, brain);
+	if (ret) goto fail;
+
+	ret = db_list_zap(&hand);
 	if (ret) goto fail;
 
 	while (!feof(fd)) {
@@ -52,25 +54,27 @@ fail:
 	return ret;
 }
 
-int initialise_map(const char *base, const char *type, const char *filename) {
+int load_map(const char *name, const char *type, const char *filename) {
 	FILE *fd;
 	char buffer[1024];
 	char *from;
 	char *to;
-	char *map;
 	int ret = OK;
 	db_hand *hand;
+	brain_t brain;
 
-	if (base == NULL || type == NULL || filename == NULL) return -EINVAL;
+	if (name == NULL || type == NULL || filename == NULL) return -EINVAL;
 
 	fd = fopen(filename, "r");
 	if (fd == NULL) return -EIO;
 
-	map = malloc((strlen(base) + strlen(type) + 2) * sizeof(char));
-	if (map == NULL) return -ENOMEM;
-	if (sprintf(map, "%s_%s", base, type) <= 0) return -EFAULT;
+	ret = db_brain_use(name, &brain);
+	if (ret) goto fail;
 
-	ret = db_map_init(map, &hand);
+	ret = db_map_init(type, &hand, brain);
+	if (ret) goto fail;
+
+	ret = db_map_zap(&hand);
 	if (ret) goto fail;
 
 	while (!feof(fd)) {

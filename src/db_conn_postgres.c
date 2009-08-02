@@ -27,10 +27,20 @@ int db_connect(void) {
 			conn = NULL;
 		} else {
 			PGresult *res = NULL;
+			const char *brains[] = { "brains" };
 			const char *words[] = { "words" };
 
 			res = PQprepare(conn, "table_exists", "SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename = $1", 1, NULL);
 			if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
+			PQclear(res);
+
+			res = PQexecPrepared(conn, "table_exists", 1, brains, NULL, NULL, 1);
+			if (PQresultStatus(res) != PGRES_TUPLES_OK) goto fail;
+			if (PQntuples(res) != 1) {
+				PQclear(res);
+				res = PQexec(conn, "CREATE TABLE brains (id BIGSERIAL UNIQUE, name TEXT, PRIMARY KEY (name))");
+				if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
+			}
 			PQclear(res);
 
 			res = PQexecPrepared(conn, "table_exists", 1, words, NULL, NULL, 1);
@@ -40,6 +50,18 @@ int db_connect(void) {
 				res = PQexec(conn, "CREATE TABLE words (id SERIAL UNIQUE, word TEXT, added TIMESTAMP NOT NULL DEFAULT NOW(), PRIMARY KEY (word))");
 				if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
 			}
+			PQclear(res);
+
+			res = PQprepare(conn, "brain_add", "INSERT INTO brains (name) VALUES($1)", 1, NULL);
+			if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
+			PQclear(res);
+
+			res = PQprepare(conn, "brain_add_id", "SELECT currval('brains_id_seq')", 0, NULL);
+			if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
+			PQclear(res);
+
+			res = PQprepare(conn, "brain_get", "SELECT id FROM brains WHERE name = $1", 1, NULL);
+			if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
 			PQclear(res);
 
 			res = PQprepare(conn, "word_add", "INSERT INTO words (word) VALUES($1)", 1, NULL);
@@ -139,6 +161,7 @@ int db_hand_init(db_hand **hand) {
     if (*hand == NULL) return -ENOMEM;
     hand_p = *hand;
 
+	hand_p->brain = NULL;
 	hand_p->get = NULL;
 	hand_p->add = NULL;
 
@@ -185,6 +208,7 @@ int db_hand_free(db_hand **hand) {
 #undef SQL
 	}
 
+	free(hand_p->brain);
 	free(hand_p->add);
 	free(hand_p->get);
 	free(*hand);
