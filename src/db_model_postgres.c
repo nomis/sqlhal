@@ -16,7 +16,7 @@ int db_model_init(db_hand **hand, brain_t brain) {
 	PGresult *res;
 	const char *models[] = { "models" };
 	const char *nodes[] = { "nodes" };
-	const char *trees[] = { "trees" };
+	const char *links[] = { "links" };
 	int nodes_created = 0;
 	struct db_hand_postgres *hand_p;
 	int ret;
@@ -41,12 +41,12 @@ int db_model_init(db_hand **hand, brain_t brain) {
 	}
 	PQclear(res);
 
-	res = PQexecPrepared(conn, "table_exists", 1, trees, NULL, NULL, 1);
+	res = PQexecPrepared(conn, "table_exists", 1, links, NULL, NULL, 1);
 	if (PQresultStatus(res) != PGRES_TUPLES_OK) goto fail;
 	if (PQntuples(res) != 1) {
 		PQclear(res);
 
-		res = PQexec(conn, "CREATE TABLE trees (parent BIGINT NOT NULL, child BIGINT NOT NULL,"\
+		res = PQexec(conn, "CREATE TABLE links (parent BIGINT NOT NULL, child BIGINT NOT NULL,"\
 			" PRIMARY KEY (parent, child),"\
 			" FOREIGN KEY (parent) REFERENCES nodes (id) ON UPDATE CASCADE ON DELETE CASCADE,"\
 			" FOREIGN KEY (child) REFERENCES nodes (id) ON UPDATE CASCADE ON DELETE CASCADE)");
@@ -122,7 +122,7 @@ int db_model_init(db_hand **hand, brain_t brain) {
 	if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
 	PQclear(res);
 
-	res = PQprepare(conn, "model_link", "INSERT INTO trees (parent, child) VALUES($1, $2)", 2, NULL);
+	res = PQprepare(conn, "model_link", "INSERT INTO links (parent, child) VALUES($1, $2)", 2, NULL);
 	if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
 	PQclear(res);
 
