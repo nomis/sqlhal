@@ -110,6 +110,10 @@ int db_model_init(db_hand **hand, brain_t brain) {
 	if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
 	PQclear(res);
 
+	res = PQprepare(conn, "model_fastcreate", "INSERT INTO nodes (brain, word, usage, count) VALUES($1, $2, $3, $4)", 4, NULL);
+	if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
+	PQclear(res);
+
 	res = PQprepare(conn, "model_create_id", "SELECT currval('nodes_id_seq')", 0, NULL);
 	if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
 	PQclear(res);
@@ -165,6 +169,9 @@ int db_model_free(db_hand **hand) {
     PQclear(res);
 
     res = PQexec(conn, "DEALLOCATE PREPARE model_create");
+    PQclear(res);
+
+    res = PQexec(conn, "DEALLOCATE PREPARE model_fastcreate");
     PQclear(res);
 
     res = PQexec(conn, "DEALLOCATE PREPARE model_create_id");
@@ -544,13 +551,17 @@ int db_model_update(db_hand **hand, db_tree *node) {
 		return -EDB;
 	}
 
-	param[0] = tmp0;
-	if (sizeof(node_t) == sizeof(unsigned long int)) {
-		if (sprintf(tmp0, "%lu", (unsigned long int)node->id) <= 0) return -EFAULT;
-	} else if (sizeof(node_t) == sizeof(unsigned long long int)) {
-		if (sprintf(tmp0, "%llu", (unsigned long long int)node->id) <= 0) return -EFAULT;
+	if (node->id == 0) {
+		param[0] = hand_p->brain;
 	} else {
-		return -EFAULT;
+		param[0] = tmp0;
+		if (sizeof(node_t) == sizeof(unsigned long int)) {
+			if (sprintf(tmp0, "%lu", (unsigned long int)node->id) <= 0) return -EFAULT;
+		} else if (sizeof(node_t) == sizeof(unsigned long long int)) {
+			if (sprintf(tmp0, "%llu", (unsigned long long int)node->id) <= 0) return -EFAULT;
+		} else {
+			return -EFAULT;
+		}
 	}
 
 	param[1] = tmp1;
@@ -580,9 +591,28 @@ int db_model_update(db_hand **hand, db_tree *node) {
 		return -EFAULT;
 	}
 
-	res = PQexecPrepared(conn, "model_update", 4, param, NULL, NULL, 0);
-	if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
-	PQclear(res);
+	if (node->id == 0) {
+		res = PQexecPrepared(conn, "model_fastcreate", 4, param, NULL, NULL, 0);
+		if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
+		PQclear(res);
+
+		res = PQexecPrepared(conn, "model_create_id", 0, NULL, NULL, NULL, 0);
+		if (PQresultStatus(res) != PGRES_TUPLES_OK) goto fail;
+		if (PQntuples(res) != 1) goto fail;
+
+		if (sizeof(word_t) == sizeof(unsigned long int)) {
+			node->id = strtoul(PQgetvalue(res, 0, 0), NULL, 10);
+		} else if (sizeof(word_t) == sizeof(unsigned long long int)) {
+			node->id = strtoull(PQgetvalue(res, 0, 0), NULL, 10);
+		} else {
+			return -EFAULT;
+		}
+		PQclear(res);
+	} else {
+		res = PQexecPrepared(conn, "model_update", 4, param, NULL, NULL, 0);
+		if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
+		PQclear(res);
+	}
 
 	return OK;
 

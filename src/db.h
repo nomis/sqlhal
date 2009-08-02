@@ -46,6 +46,7 @@ int db_model_get_order(db_hand **hand, number_t *order);           /* get model 
 int db_model_set_order(db_hand **hand, number_t order);            /* set model order (required) */
 
 int db_model_get_root(db_hand **hand, db_tree **forward, db_tree **backward); /* get or create forward/backward nodes */
+db_tree *db_model_node_alloc(void);                                           /* allocate node for creation on first update */
 int db_model_create(db_hand **hand, db_tree **node);                          /* create node */
 int db_model_update(db_hand **hand, db_tree *node);                           /* update node */
 int db_model_link(db_hand **hand, db_tree *parent, db_tree *child);           /* add node to tree */

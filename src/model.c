@@ -56,8 +56,8 @@ int load_tree(FILE *fd, enum load_mode mode, uint32_t dict_size, word_t *dict_wo
 				db_tree *node = NULL;
 
 				if (tree != NULL) {
-					ret = db_model_create(hand, &node);
-					if (ret) return ret;
+					node = db_model_node_alloc();
+					if (node == NULL) return -ENOMEM;
 				}
 
 				ret = load_tree(fd, mode, dict_size, dict_words, hand, node);
@@ -150,7 +150,7 @@ int load_brain(char *name, const char *filename) {
 		goto fail;
 	}
 
-	fread(&tmp8, sizeof(tmp8), 1, fd);
+	if (!fread(&tmp8, sizeof(tmp8), 1, fd)) return -EIO;
 	order = tmp8;
 
 	ret = db_model_set_order(&hand, order);
@@ -178,17 +178,16 @@ int load_brain(char *name, const char *filename) {
 	log_info("load_brain", dict_size, "Dictionary loaded");
 
 	/* Read most of the file again... */
-	rewind(fd);
-	fread(&tmp8, sizeof(tmp8), 1, fd);
+	if (fseek(fd, sizeof(char) * strlen(COOKIE) + sizeof(tmp8), SEEK_SET)) return -EIO;
 
-	ret = load_tree(fd, LOAD_FORWARD, dict_size, dict_words, hand, forward);
+	ret = load_tree(fd, LOAD_FORWARD, dict_size, dict_words, &hand, forward);
 	if (ret) goto fail;
 
 	db_model_node_free(&forward);
 
 	log_info("load_brain", 0, "Forward tree loaded");
 
-	ret = load_tree(fd, LOAD_BACKWARD, dict_size, dict_words, hand, backward);
+	ret = load_tree(fd, LOAD_BACKWARD, dict_size, dict_words, &hand, backward);
 	if (ret) goto fail;
 
 	db_model_node_free(&backward);

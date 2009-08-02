@@ -1,5 +1,5 @@
 DB=postgres
-CFLAGS=-Wall -Werror -g -O0
+CFLAGS=-Wall -Wextra -Wshadow -Werror -g -O0
 
 STD_H=err.h types.h
 BIN=brain
