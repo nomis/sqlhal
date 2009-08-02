@@ -51,6 +51,10 @@ int db_model_init(db_hand **hand, brain_t brain) {
 			" FOREIGN KEY (parent) REFERENCES nodes (id) ON UPDATE CASCADE ON DELETE CASCADE,"\
 			" FOREIGN KEY (child) REFERENCES nodes (id) ON UPDATE CASCADE ON DELETE CASCADE)");
 		if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
+		PQclear(res);
+
+		res = PQexec(conn, "CREATE INDEX links_rkey ON links (child, parent)");
+		if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
 	}
 	PQclear(res);
 
