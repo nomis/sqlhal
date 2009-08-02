@@ -55,7 +55,7 @@ int main(int argc, char *argv[]) {
 	char *state;
 
 	if (argc != 4 || (strcmp(argv[1], "load") && strcmp(argv[1], "save"))) {
-		printf("Brain loader/saver\n");
+		printf("Brain manipulation\n");
 		printf("Usage: %s load <name> <filename prefix>\n", argv[0]);
 		printf("       %s save <name> <filename prefix>\n", argv[0]);
 		return 1;
@@ -100,6 +100,10 @@ int main(int argc, char *argv[]) {
 		ret = do_brain(name, prefix);
 		if (ret) { log_warn("brain", ret, state); fail = 1; }
 		else log_info("brain", ret, state);
+	} else if (!strcmp(action, "save")) {
+		fail = 1;
+	} else {
+		fail = 1;
 	}
 
 	if (fail) {
