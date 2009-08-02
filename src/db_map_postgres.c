@@ -51,9 +51,9 @@ int db_map_init(const char *map, db_hand **hand, brain_t brain) {
 
 	hand_p->brain = malloc(21 * sizeof(char));
 	if (hand_p->brain == NULL) { ret = -ENOMEM; goto fail_free; }
-	if (sizeof(word_t) == sizeof(unsigned long int)) {
+	if (sizeof(brain_t) == sizeof(unsigned long int)) {
 		if (sprintf(hand_p->brain, "%lu", (unsigned long int)brain) <= 0) { ret = -ENOMEM; goto fail_free; }
-	} else if (sizeof(word_t) == sizeof(unsigned long long int)) {
+	} else if (sizeof(brain_t) == sizeof(unsigned long long int)) {
 		if (sprintf(hand_p->brain, "%llu", (unsigned long long int)brain) <= 0) { ret = -ENOMEM; goto fail_free; }
 	} else {
 	return -EFAULT;
