@@ -129,7 +129,7 @@ int db_list_add(db_hand **hand, word_t *word) {
 	PGresult *res;
 	const char *param[2];
 	struct db_hand_postgres *hand_p;
-	char tmp[128];
+	char tmp1[32];
 
 	if (hand == NULL || *hand == NULL || word == NULL) return -EINVAL;
 	hand_p = *hand;
@@ -139,11 +139,11 @@ int db_list_add(db_hand **hand, word_t *word) {
 	}
 
 	param[0] = hand_p->brain;
-	param[1] = tmp;
+	param[1] = tmp1;
 	if (sizeof(word_t) == sizeof(unsigned long int)) {
-		if (sprintf(tmp, "%lu", (unsigned long int)*word) <= 0) return -EFAULT;
+		if (sprintf(tmp1, "%lu", (unsigned long int)*word) <= 0) return -EFAULT;
 	} else if (sizeof(word_t) == sizeof(unsigned long long int)) {
-		if (sprintf(tmp, "%llu", (unsigned long long int)*word) <= 0) return -EFAULT;
+		if (sprintf(tmp1, "%llu", (unsigned long long int)*word) <= 0) return -EFAULT;
 	} else {
 		return -EFAULT;
 	}
@@ -164,7 +164,7 @@ int db_list_contains(db_hand **hand, word_t *word) {
 	PGresult *res;
 	const char *param[2];
 	struct db_hand_postgres *hand_p;
-	char tmp[128];
+	char tmp1[32];
 
 	if (hand == NULL || *hand == NULL || word == NULL) return -EINVAL;
 	hand_p = *hand;
@@ -174,11 +174,11 @@ int db_list_contains(db_hand **hand, word_t *word) {
 	}
 
 	param[0] = hand_p->brain;
-	param[1] = tmp;
+	param[1] = tmp1;
 	if (sizeof(word_t) == sizeof(unsigned long int)) {
-		if (sprintf(tmp, "%lu", (unsigned long int)*word) <= 0) return -EFAULT;
+		if (sprintf(tmp1, "%lu", (unsigned long int)*word) <= 0) return -EFAULT;
 	} else if (sizeof(word_t) == sizeof(unsigned long long int)) {
-		if (sprintf(tmp, "%llu", (unsigned long long int)*word) <= 0) return -EFAULT;
+		if (sprintf(tmp1, "%llu", (unsigned long long int)*word) <= 0) return -EFAULT;
 	} else {
 		return -EFAULT;
 	}

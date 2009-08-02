@@ -129,8 +129,8 @@ int db_map_put(db_hand **hand, word_t *key, word_t *value) {
 	PGresult *res;
 	const char *param[3];
 	struct db_hand_postgres *hand_p;
-	char tmp[128];
-	char tmp2[128];
+	char tmp1[32];
+	char tmp2[32];
 
 	if (hand == NULL || *hand == NULL || key == NULL || value == NULL) return -EINVAL;
 	hand_p = *hand;
@@ -140,13 +140,13 @@ int db_map_put(db_hand **hand, word_t *key, word_t *value) {
 	}
 
 	param[0] = hand_p->brain;
-	param[1] = tmp;
+	param[1] = tmp1;
 	param[2] = tmp2;
 	if (sizeof(word_t) == sizeof(unsigned long int)) {
-		if (sprintf(tmp, "%lu", (unsigned long int)*key) <= 0) return -EFAULT;
+		if (sprintf(tmp1, "%lu", (unsigned long int)*key) <= 0) return -EFAULT;
 		if (sprintf(tmp2, "%lu", (unsigned long int)*value) <= 0) return -EFAULT;
 	} else if (sizeof(word_t) == sizeof(unsigned long long int)) {
-		if (sprintf(tmp, "%llu", (unsigned long long int)*key) <= 0) return -EFAULT;
+		if (sprintf(tmp1, "%llu", (unsigned long long int)*key) <= 0) return -EFAULT;
 		if (sprintf(tmp2, "%llu", (unsigned long long int)*value) <= 0) return -EFAULT;
 	} else {
 		return -EFAULT;
@@ -168,7 +168,7 @@ int db_map_get(db_hand **hand, word_t *key, word_t *value) {
 	PGresult *res;
 	const char *param[2];
 	struct db_hand_postgres *hand_p;
-	char tmp[128];
+	char tmp[32];
 
 	if (hand == NULL || *hand == NULL || key == NULL || value == NULL) return -EINVAL;
 	hand_p = *hand;
