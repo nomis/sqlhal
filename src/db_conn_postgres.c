@@ -38,7 +38,9 @@ int db_connect(void) {
 			if (PQresultStatus(res) != PGRES_TUPLES_OK) goto fail;
 			if (PQntuples(res) != 1) {
 				PQclear(res);
-				res = PQexec(conn, "CREATE TABLE brains (id BIGSERIAL UNIQUE, name TEXT, PRIMARY KEY (name))");
+				res = PQexec(conn, "CREATE TABLE brains (id BIGSERIAL UNIQUE, name TEXT,"\
+					" PRIMARY KEY (name),"\
+					" CONSTRAINT valid_id CHECK (id > 0))");
 				if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
 			}
 			PQclear(res);
@@ -47,7 +49,9 @@ int db_connect(void) {
 			if (PQresultStatus(res) != PGRES_TUPLES_OK) goto fail;
 			if (PQntuples(res) != 1) {
 				PQclear(res);
-				res = PQexec(conn, "CREATE TABLE words (id SERIAL UNIQUE, word TEXT, added TIMESTAMP NOT NULL DEFAULT NOW(), PRIMARY KEY (word))");
+				res = PQexec(conn, "CREATE TABLE words (id SERIAL UNIQUE, word TEXT, added TIMESTAMP NOT NULL DEFAULT NOW(),"\
+					" PRIMARY KEY (word),"\
+					" CONSTRAINT valid_id CHECK (id > 0))");
 				if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
 			}
 			PQclear(res);
