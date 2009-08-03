@@ -58,15 +58,15 @@ int load_tree(FILE *fd, enum load_mode mode, uint32_t dict_size, word_t *dict_wo
 				if (tree != NULL) {
 					node = db_model_node_alloc();
 					if (node == NULL) return -ENOMEM;
+
+					ret = db_model_link(tree, node);
+					if (ret) return ret;
 				}
 
 				ret = load_tree(fd, mode, dict_size, dict_words, hand, node);
 				if (ret) return ret;
 
 				if (tree != NULL) {
-					ret = db_model_link(hand, tree, node);
-					if (ret) return ret;
-
 					db_model_node_free(&node);
 				}
 			}

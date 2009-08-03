@@ -16,7 +16,6 @@ int db_model_init(db_hand **hand, brain_t brain) {
 	PGresult *res;
 	const char *models[] = { "models" };
 	const char *nodes[] = { "nodes" };
-	const char *links[] = { "links" };
 	int nodes_created = 0;
 	struct db_hand_postgres *hand_p;
 	int ret;
@@ -31,30 +30,26 @@ int db_model_init(db_hand **hand, brain_t brain) {
 	if (PQntuples(res) != 1) {
 		PQclear(res);
 
-		res = PQexec(conn, "CREATE TABLE nodes (id BIGSERIAL UNIQUE, brain BIGINT NOT NULL, word BIGINT, usage BIGINT NOT NULL, count BIGINT NOT NULL,"\
+		res = PQexec(conn, "CREATE TABLE nodes (id BIGSERIAL UNIQUE, brain BIGINT NOT NULL, parent BIGINT, word BIGINT, usage BIGINT NOT NULL, count BIGINT NOT NULL,"\
 			" PRIMARY KEY (id),"\
+			" FOREIGN KEY (parent) REFERENCES nodes (id) ON UPDATE CASCADE ON DELETE CASCADE,"\
 			" FOREIGN KEY (word) REFERENCES words (id) ON UPDATE CASCADE ON DELETE CASCADE,"\
+			" CONSTRAINT valid_id CHECK (id > 0),"\
 			" CONSTRAINT valid_usage CHECK (usage >= 0),"\
 			" CONSTRAINT valid_count CHECK (count >= 0))");
 		if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
+		PQclear(res);
+
+		res = PQexec(conn, "CREATE INDEX nodes_brain ON nodes (brain)");
+		if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
+		PQclear(res);
+
+		res = PQexec(conn, "CREATE INDEX nodes_words ON nodes (word)");
+		if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
+
+		res = PQexec(conn, "CREATE INDEX nodes_child ON nodes (parent)");
+		if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
 		nodes_created = 1;
-	}
-	PQclear(res);
-
-	res = PQexecPrepared(conn, "table_exists", 1, links, NULL, NULL, 1);
-	if (PQresultStatus(res) != PGRES_TUPLES_OK) goto fail;
-	if (PQntuples(res) != 1) {
-		PQclear(res);
-
-		res = PQexec(conn, "CREATE TABLE links (parent BIGINT NOT NULL, child BIGINT NOT NULL,"\
-			" PRIMARY KEY (parent, child),"\
-			" FOREIGN KEY (parent) REFERENCES nodes (id) ON UPDATE CASCADE ON DELETE CASCADE,"\
-			" FOREIGN KEY (child) REFERENCES nodes (id) ON UPDATE CASCADE ON DELETE CASCADE)");
-		if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
-		PQclear(res);
-
-		res = PQexec(conn, "CREATE INDEX links_rkey ON links (child, parent)");
-		if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
 	}
 	PQclear(res);
 
@@ -114,7 +109,7 @@ int db_model_init(db_hand **hand, brain_t brain) {
 	if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
 	PQclear(res);
 
-	res = PQprepare(conn, "model_fastcreate", "INSERT INTO nodes (brain, word, usage, count) VALUES($1, $2, $3, $4)", 4, NULL);
+	res = PQprepare(conn, "model_fastcreate", "INSERT INTO nodes (brain, usage, count, word, parent) VALUES($1, $2, $3, $4, $5)", 5, NULL);
 	if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
 	PQclear(res);
 
@@ -122,11 +117,11 @@ int db_model_init(db_hand **hand, brain_t brain) {
 	if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
 	PQclear(res);
 
-	res = PQprepare(conn, "model_update", "UPDATE nodes SET word = $2, usage = $3, count = $4 WHERE id = $1", 4, NULL);
+	res = PQprepare(conn, "model_rootupdate", "UPDATE nodes SET parent = NULL, usage = $2, count = $3, word = $4 WHERE id = $1", 4, NULL);
 	if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
 	PQclear(res);
 
-	res = PQprepare(conn, "model_link", "INSERT INTO links (parent, child) VALUES($1, $2)", 2, NULL);
+	res = PQprepare(conn, "model_update", "UPDATE nodes SET usage = $2, count = $3 WHERE id = $1", 3, NULL);
 	if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
 	PQclear(res);
 
@@ -181,10 +176,10 @@ int db_model_free(db_hand **hand) {
     res = PQexec(conn, "DEALLOCATE PREPARE model_create_id");
     PQclear(res);
 
-    res = PQexec(conn, "DEALLOCATE PREPARE model_update");
+    res = PQexec(conn, "DEALLOCATE PREPARE model_rootupdate");
     PQclear(res);
 
-    res = PQexec(conn, "DEALLOCATE PREPARE model_link");
+    res = PQexec(conn, "DEALLOCATE PREPARE model_update");
     PQclear(res);
 
     res = PQexec(conn, "DEALLOCATE PREPARE model_root_get");
@@ -316,6 +311,7 @@ db_tree *db_model_node_alloc(void) {
 	if (node == NULL) return NULL;
 
 	node->id = 0;
+	node->parent_id = 0;
 	node->word = 0;
 	node->usage = 0;
 	node->count = 0;
@@ -541,12 +537,13 @@ fail:
 
 int db_model_update(db_hand **hand, db_tree *node) {
 	PGresult *res;
-	const char *param[4];
+	const char *param[5];
 	struct db_hand_postgres *hand_p;
 	char tmp0[32];
 	char tmp1[32];
 	char tmp2[32];
 	char tmp3[32];
+	char tmp4[32];
 
 	if (hand == NULL || *hand == NULL || node == NULL) return -EINVAL;
 	hand_p = *hand;
@@ -569,34 +566,47 @@ int db_model_update(db_hand **hand, db_tree *node) {
 	}
 
 	param[1] = tmp1;
-	if (sizeof(word_t) == sizeof(unsigned long int)) {
-		if (sprintf(tmp1, "%lu", (unsigned long int)node->word) <= 0) return -EFAULT;
-	} else if (sizeof(word_t) == sizeof(unsigned long long int)) {
-		if (sprintf(tmp1, "%llu", (unsigned long long int)node->word) <= 0) return -EFAULT;
+	if (sizeof(number_t) == sizeof(unsigned long int)) {
+		if (sprintf(tmp1, "%lu", (unsigned long int)node->usage) <= 0) return -EFAULT;
+	} else if (sizeof(number_t) == sizeof(unsigned long long int)) {
+		if (sprintf(tmp1, "%llu", (unsigned long long int)node->usage) <= 0) return -EFAULT;
 	} else {
 		return -EFAULT;
 	}
 
 	param[2] = tmp2;
 	if (sizeof(number_t) == sizeof(unsigned long int)) {
-		if (sprintf(tmp2, "%lu", (unsigned long int)node->usage) <= 0) return -EFAULT;
+		if (sprintf(tmp2, "%lu", (unsigned long int)node->count) <= 0) return -EFAULT;
 	} else if (sizeof(number_t) == sizeof(unsigned long long int)) {
 		if (sprintf(tmp2, "%llu", (unsigned long long int)node->count) <= 0) return -EFAULT;
 	} else {
 		return -EFAULT;
 	}
 
-	param[3] = tmp3;
-	if (sizeof(number_t) == sizeof(unsigned long int)) {
-		if (sprintf(tmp3, "%lu", (unsigned long int)node->usage) <= 0) return -EFAULT;
-	} else if (sizeof(number_t) == sizeof(unsigned long long int)) {
-		if (sprintf(tmp3, "%llu", (unsigned long long int)node->count) <= 0) return -EFAULT;
-	} else {
-		return -EFAULT;
+	if (node->id == 0 || node->parent_id == 0) {
+		param[3] = tmp3;
+		if (sizeof(word_t) == sizeof(unsigned long int)) {
+			if (sprintf(tmp3, "%lu", (unsigned long int)node->word) <= 0) return -EFAULT;
+		} else if (sizeof(word_t) == sizeof(unsigned long long int)) {
+			if (sprintf(tmp3, "%llu", (unsigned long long int)node->word) <= 0) return -EFAULT;
+		} else {
+			return -EFAULT;
+		}
 	}
 
 	if (node->id == 0) {
-		res = PQexecPrepared(conn, "model_fastcreate", 4, param, NULL, NULL, 0);
+		param[4] = tmp4;
+		if (sizeof(word_t) == sizeof(unsigned long int)) {
+			if (sprintf(tmp4, "%lu", (unsigned long int)node->parent_id) <= 0) return -EFAULT;
+		} else if (sizeof(word_t) == sizeof(unsigned long long int)) {
+			if (sprintf(tmp4, "%llu", (unsigned long long int)node->parent_id) <= 0) return -EFAULT;
+		} else {
+			return -EFAULT;
+		}
+	}
+
+	if (node->id == 0) {
+		res = PQexecPrepared(conn, "model_fastcreate", 5, param, NULL, NULL, 0);
 		if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
 		PQclear(res);
 
@@ -612,8 +622,12 @@ int db_model_update(db_hand **hand, db_tree *node) {
 			return -EFAULT;
 		}
 		PQclear(res);
+	} else if (node->parent_id == 0) {
+		res = PQexecPrepared(conn, "model_rootupdate", 4, param, NULL, NULL, 0);
+		if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
+		PQclear(res);
 	} else {
-		res = PQexecPrepared(conn, "model_update", 4, param, NULL, NULL, 0);
+		res = PQexecPrepared(conn, "model_update", 3, param, NULL, NULL, 0);
 		if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
 		PQclear(res);
 	}
@@ -626,48 +640,13 @@ fail:
 	return -EDB;
 }
 
-int db_model_link(db_hand **hand, db_tree *parent, db_tree *child) {
-	PGresult *res;
-	const char *param[2];
-	struct db_hand_postgres *hand_p;
-	char tmp0[32];
-	char tmp1[32];
+int db_model_link(db_tree *parent, db_tree *child) {
+	if (parent == NULL || child == NULL) return -EINVAL;
+	if (parent->id == 0) return -EINVAL;
+	if (child->parent_id != 0) return -EINVAL;
 
-	if (hand == NULL || *hand == NULL || parent == NULL || child == NULL) return -EINVAL;
-	hand_p = *hand;
-	if (db_connect()) {
-		db_model_free(hand);
-		return -EDB;
-	}
-
-	param[0] = tmp0;
-	if (sizeof(node_t) == sizeof(unsigned long int)) {
-		if (sprintf(tmp0, "%lu", (unsigned long int)parent->id) <= 0) return -EFAULT;
-	} else if (sizeof(node_t) == sizeof(unsigned long long int)) {
-		if (sprintf(tmp0, "%llu", (unsigned long long int)parent->id) <= 0) return -EFAULT;
-	} else {
-		return -EFAULT;
-	}
-
-	param[1] = tmp1;
-	if (sizeof(node_t) == sizeof(unsigned long int)) {
-		if (sprintf(tmp1, "%lu", (unsigned long int)child->id) <= 0) return -EFAULT;
-	} else if (sizeof(node_t) == sizeof(unsigned long long int)) {
-		if (sprintf(tmp1, "%llu", (unsigned long long int)child->id) <= 0) return -EFAULT;
-	} else {
-		return -EFAULT;
-	}
-
-	res = PQexecPrepared(conn, "model_link", 2, param, NULL, NULL, 0);
-	if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
-	PQclear(res);
-
+	child->parent_id = parent->id;
 	return OK;
-
-fail:
-	log_error("db_model_link", PQresultStatus(res), PQresultErrorMessage(res));
-	PQclear(res);
-	return -EDB;
 }
 
 void db_model_node_free(db_tree **node) {

@@ -32,6 +32,7 @@ int db_map_del(db_hand **hand, word_t *key, word_t *value);        /* delete key
 
 typedef struct {
 	node_t id;
+	node_t parent_id;
 	word_t word;
 	number_t usage;
 	number_t count;
@@ -49,5 +50,5 @@ int db_model_get_root(db_hand **hand, db_tree **forward, db_tree **backward); /*
 db_tree *db_model_node_alloc(void);                                           /* allocate node for creation on first update */
 int db_model_create(db_hand **hand, db_tree **node);                          /* create node */
 int db_model_update(db_hand **hand, db_tree *node);                           /* update node */
-int db_model_link(db_hand **hand, db_tree *parent, db_tree *child);           /* add node to tree */
+int db_model_link(db_tree *parent, db_tree *child);                           /* add node to tree */
 void db_model_node_free(db_tree **node);                                      /* free node data (recursively) */
