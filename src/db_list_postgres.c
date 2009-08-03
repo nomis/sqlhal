@@ -29,7 +29,7 @@ int db_list_init(const char *list, db_hand **hand, brain_t brain) {
 	if (PQntuples(res) != 1) {
 		PQclear(res);
 
-#define SQL "CREATE TABLE %s (brain BIGINT NOT NULL, word BIGINT NOT NULL,"\
+#define SQL "CREATE TABLE list_%s (brain BIGINT NOT NULL, word BIGINT NOT NULL,"\
 	" PRIMARY KEY (brain, word),"\
 	" FOREIGN KEY (brain) REFERENCES brains (id) ON UPDATE CASCADE ON DELETE CASCADE,"\
 	" FOREIGN KEY (word) REFERENCES words (id) ON UPDATE CASCADE ON DELETE CASCADE)"
@@ -70,7 +70,7 @@ int db_list_init(const char *list, db_hand **hand, brain_t brain) {
 	if (hand_p->zap == NULL) { ret = -ENOMEM; goto fail_free; }
 	if (sprintf(hand_p->zap, "list_%s_zap", list) <= 0) { ret = -ENOMEM; goto fail_free; }
 
-#define SQL "INSERT INTO %s (brain, word) VALUES($1, $2)"
+#define SQL "INSERT INTO list_%s (brain, word) VALUES($1, $2)"
 	sql = malloc((strlen(SQL) + strlen(list)) * sizeof(char));
 	if (sql == NULL) { ret = -ENOMEM; goto fail_free; }
 	if (sprintf(sql, SQL, list) <= 0) { ret = -EFAULT; free(sql); goto fail_free; }
@@ -81,7 +81,7 @@ int db_list_init(const char *list, db_hand **hand, brain_t brain) {
 	if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
 	PQclear(res);
 
-#define SQL "SELECT word FROM %s WHERE brain = $1 AND word = $2"
+#define SQL "SELECT word FROM list_%s WHERE brain = $1 AND word = $2"
 	sql = malloc((strlen(SQL) + strlen(list)) * sizeof(char));
 	if (sql == NULL) { ret = -ENOMEM; goto fail_free; }
 	if (sprintf(sql, SQL, list) <= 0) { ret = -EFAULT; free(sql); goto fail_free; }
@@ -92,7 +92,7 @@ int db_list_init(const char *list, db_hand **hand, brain_t brain) {
 	if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
 	PQclear(res);
 
-#define SQL "DELETE FROM %s WHERE brain = $1"
+#define SQL "DELETE FROM list_%s WHERE brain = $1"
 	sql = malloc((strlen(SQL) + strlen(list)) * sizeof(char));
 	if (sql == NULL) { ret = -ENOMEM; goto fail_free; }
 	if (sprintf(sql, SQL, list) <= 0) { ret = -EFAULT; free(sql); goto fail_free; }
