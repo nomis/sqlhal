@@ -29,7 +29,7 @@ int db_map_init(const char *map, db_hand **hand, brain_t brain) {
 	if (PQntuples(res) != 1) {
 		PQclear(res);
 
-#define SQL "CREATE TABLE %s (brain BIGINT NOT NULL, key BIGINT NOT NULL, value BIGINT NOT NULL,"\
+#define SQL "CREATE TABLE map_%s (brain BIGINT NOT NULL, key BIGINT NOT NULL, value BIGINT NOT NULL,"\
 	" PRIMARY KEY (brain, key),"\
 	" FOREIGN KEY (brain) REFERENCES brains (id) ON UPDATE CASCADE ON DELETE CASCADE,"\
 	" FOREIGN KEY (key) REFERENCES words (id) ON UPDATE CASCADE ON DELETE CASCADE,"\
@@ -71,7 +71,7 @@ int db_map_init(const char *map, db_hand **hand, brain_t brain) {
 	if (hand_p->get == NULL) { ret = -ENOMEM; goto fail_free; }
 	if (sprintf(hand_p->zap, "map_%s_zap", map) <= 0) { ret = -ENOMEM; goto fail_free; }
 
-#define SQL "INSERT INTO %s (brain, key, value) VALUES($1, $2, $3)"
+#define SQL "INSERT INTO map_%s (brain, key, value) VALUES($1, $2, $3)"
 	sql = malloc((strlen(SQL) + strlen(map)) * sizeof(char));
 	if (sql == NULL) { ret = -ENOMEM; goto fail_free; }
 	if (sprintf(sql, SQL, map) <= 0) { ret = -EFAULT; free(sql); goto fail_free; }
@@ -82,7 +82,7 @@ int db_map_init(const char *map, db_hand **hand, brain_t brain) {
 	if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
 	PQclear(res);
 
-#define SQL "SELECT value FROM %s WHERE brain = $1 AND key = $2"
+#define SQL "SELECT value FROM map_%s WHERE brain = $1 AND key = $2"
 	sql = malloc((strlen(SQL) + strlen(map)) * sizeof(char));
 	if (sql == NULL) { ret = -ENOMEM; goto fail_free; }
 	if (sprintf(sql, SQL, map) <= 0) { ret = -EFAULT; free(sql); goto fail_free; }
@@ -93,7 +93,7 @@ int db_map_init(const char *map, db_hand **hand, brain_t brain) {
 	if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
 	PQclear(res);
 
-#define SQL "DELETE FROM %s WHERE brain = $1"
+#define SQL "DELETE FROM map_%s WHERE brain = $1"
 	sql = malloc((strlen(SQL) + strlen(map)) * sizeof(char));
 	if (sql == NULL) { ret = -ENOMEM; goto fail_free; }
 	if (sprintf(sql, SQL, map) <= 0) { ret = -EFAULT; free(sql); goto fail_free; }
