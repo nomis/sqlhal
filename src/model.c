@@ -17,7 +17,7 @@ enum load_mode {
 	LOAD_APPEND
 };
 
-int load_tree(FILE *fd, enum load_mode mode, uint32_t dict_size, word_t *dict_words, db_hand **hand, db_tree *tree) {
+int load_tree(FILE *fd, enum load_mode mode, uint32_t dict_size, word_t *dict_words, brain_t brain, db_tree *tree) {
 	uint16_t symbol;
 	uint32_t usage;
 	uint16_t count;
@@ -40,7 +40,7 @@ int load_tree(FILE *fd, enum load_mode mode, uint32_t dict_size, word_t *dict_wo
 		tree->usage = usage;
 		tree->count = count;
 
-		ret = db_model_update(hand, tree);
+		ret = db_model_update(brain, tree);
 		if (ret) return ret;
 	}
 
@@ -49,7 +49,7 @@ int load_tree(FILE *fd, enum load_mode mode, uint32_t dict_size, word_t *dict_wo
 	switch (mode) {
 		case LOAD_FORWARD:
 		case LOAD_BACKWARD:
-			if (dict_words == NULL || hand == NULL || tree == NULL)
+			if (dict_words == NULL || brain == 0 || tree == NULL)
 				return -EINVAL;
 		case LOAD_IGNORE:
 			for (i = 0; i < branch; i++) {
@@ -63,7 +63,7 @@ int load_tree(FILE *fd, enum load_mode mode, uint32_t dict_size, word_t *dict_wo
 					if (ret) return ret;
 				}
 
-				ret = load_tree(fd, mode, dict_size, dict_words, hand, node);
+				ret = load_tree(fd, mode, dict_size, dict_words, brain, node);
 				if (ret) return ret;
 
 				if (tree != NULL) {
@@ -118,7 +118,6 @@ int load_brain(char *name, const char *filename) {
 	FILE *fd;
 	int ret = OK;
 	brain_t brain;
-	db_hand *hand;
 	char cookie[16];
 	number_t order;
 	uint8_t tmp8;
@@ -137,10 +136,7 @@ int load_brain(char *name, const char *filename) {
 	ret = db_brain_use(name, &brain);
 	if (ret) goto fail;
 
-	ret = db_model_init(&hand, brain);
-	if (ret) goto fail;
-
-	ret = db_model_zap(&hand);
+	ret = db_model_zap(brain);
 	if (ret) goto fail;
 
 	if (!fread(cookie, sizeof(char), strlen(COOKIE), fd)) return -EIO;
@@ -153,21 +149,21 @@ int load_brain(char *name, const char *filename) {
 	if (!fread(&tmp8, sizeof(tmp8), 1, fd)) return -EIO;
 	order = tmp8;
 
-	ret = db_model_set_order(&hand, order);
+	ret = db_model_set_order(brain, order);
 	if (ret) goto fail;
 
-	ret = db_model_get_root(&hand, &forward, &backward);
+	ret = db_model_get_root(brain, &forward, &backward);
 	if (ret) goto fail;
 
 	/* Bah. The word dictionary is at the end of the file.
 	 * Either the file can be read twice or we can waste a ton of memory caching the tree.
 	 */
-	ret = load_tree(fd, LOAD_IGNORE, 0, NULL, NULL, NULL); /* forward */
+	ret = load_tree(fd, LOAD_IGNORE, 0, NULL, 0, NULL); /* forward */
 	if (ret) goto fail;
 
 	log_info("load_brain", 0, "Skipped forward tree");
 
-	ret = load_tree(fd, LOAD_IGNORE, 0, NULL, NULL, NULL); /* backward */
+	ret = load_tree(fd, LOAD_IGNORE, 0, NULL, 0, NULL); /* backward */
 	if (ret) goto fail;
 
 	log_info("load_brain", 0, "Skipped backward tree");
@@ -180,21 +176,19 @@ int load_brain(char *name, const char *filename) {
 	/* Read most of the file again... */
 	if (fseek(fd, sizeof(char) * strlen(COOKIE) + sizeof(tmp8), SEEK_SET)) return -EIO;
 
-	ret = load_tree(fd, LOAD_FORWARD, dict_size, dict_words, &hand, forward);
+	ret = load_tree(fd, LOAD_FORWARD, dict_size, dict_words, brain, forward);
 	if (ret) goto fail;
 
 	db_model_node_free(&forward);
 
 	log_info("load_brain", 0, "Forward tree loaded");
 
-	ret = load_tree(fd, LOAD_BACKWARD, dict_size, dict_words, &hand, backward);
+	ret = load_tree(fd, LOAD_BACKWARD, dict_size, dict_words, brain, backward);
 	if (ret) goto fail;
 
 	db_model_node_free(&backward);
 
 	log_info("load_brain", 0, "Backward tree loaded");
-
-	ret = db_model_free(&hand);
 
 	free_dict(&dict_size, &dict_words);
 

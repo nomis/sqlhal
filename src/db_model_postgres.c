@@ -31,7 +31,7 @@ int db_model_init(db_hand **hand, brain_t brain) {
 		PQclear(res);
 
 		res = PQexec(conn, "CREATE TABLE nodes (id BIGSERIAL UNIQUE, brain BIGINT NOT NULL, parent BIGINT, word BIGINT, usage BIGINT NOT NULL, count BIGINT NOT NULL,"\
-			" PRIMARY KEY (id),"\
+			" PRIMARY KEY (brain, id),"\
 			" FOREIGN KEY (parent) REFERENCES nodes (id) ON UPDATE CASCADE ON DELETE CASCADE,"\
 			" FOREIGN KEY (word) REFERENCES words (id) ON UPDATE CASCADE ON DELETE CASCADE,"\
 			" CONSTRAINT valid_id CHECK (id > 0),"\
@@ -129,7 +129,7 @@ int db_model_init(db_hand **hand, brain_t brain) {
 	if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
 	PQclear(res);
 
-	res = PQprepare(conn, "model_node_get", "SELECT word, usage, count FROM nodes WHERE id = $1", 1, NULL);
+	res = PQprepare(conn, "model_node_get", "SELECT word, usage, count FROM nodes WHERE brain = $1 AND id = $2", 2, NULL);
 	if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
 	PQclear(res);
 
@@ -194,30 +194,23 @@ int db_model_free(db_hand **hand) {
 	return db_hand_free(hand);
 }
 
-int db_model_get_order(db_hand **hand, number_t *order) {
+int db_model_get_order(brain_t brain, number_t *order) {
 	PGresult *res;
 	const char *param[1];
-	struct db_hand_postgres *hand_p;
+	char tmp[1][32];
 
-	if (hand == NULL || *hand == NULL || order == NULL) return -EINVAL;
-	hand_p = *hand;
-	if (db_connect()) {
-		db_model_free(hand);
+	if (brain == 0 || order == NULL) return -EINVAL;
+	if (db_connect())
 		return -EDB;
-	}
 
-	param[0] = hand_p->brain;
+	SET_PARAM(param, tmp, 0, brain);
+
 	res = PQexecPrepared(conn, "model_get", 1, param, NULL, NULL, 0);
 	if (PQresultStatus(res) != PGRES_TUPLES_OK) goto fail;
 	if (PQntuples(res) == 0) goto not_found;
 
-	if (sizeof(number_t) == sizeof(unsigned long int)) {
-		*order = strtoul(PQgetvalue(res, 0, 0), NULL, 10);
-	} else if (sizeof(number_t) == sizeof(unsigned long long int)) {
-		*order = strtoull(PQgetvalue(res, 0, 0), NULL, 10);
-	} else {
-		return -EFAULT;
-	}
+	GET_VALUE(res, 0, 0, *order);
+
 	PQclear(res);
 
 	return OK;
@@ -232,42 +225,31 @@ not_found:
 	return -ENOTFOUND;
 }
 
-int db_model_set_order(db_hand **hand, number_t order) {
+int db_model_set_order(brain_t brain, number_t order) {
 	PGresult *res;
-	const char *param[1];
-	struct db_hand_postgres *hand_p;
-	char tmp[32];
-	number_t tmp2;
+	const char *param[2];
+	char tmp[2][32];
+	number_t current;
 	int ret;
 
-	if (hand == NULL || *hand == NULL) return -EINVAL;
-	hand_p = *hand;
-	if (db_connect()) {
-		db_model_free(hand);
+	if (brain == 0 || order == 0) return -EINVAL;
+	if (db_connect())
 		return -EDB;
-	}
 
-	param[0] = hand_p->brain;
-	param[1] = tmp;
-	if (sizeof(number_t) == sizeof(unsigned long int)) {
-		if (sprintf(tmp, "%lu", (unsigned long int)order) <= 0) return -EFAULT;
-	} else if (sizeof(number_t) == sizeof(unsigned long long int)) {
-		if (sprintf(tmp, "%llu", (unsigned long long int)order) <= 0) return -EFAULT;
-	} else {
-		return -EFAULT;
-	}
+	SET_PARAM(param, tmp, 0, brain);
+	SET_PARAM(param, tmp, 1, order);
 
-	ret = db_model_get_order(hand, &tmp2);
-	if (ret && ret != -ENOTFOUND) return ret;
-
+	ret = db_model_get_order(brain, &current);
 	if (ret == -ENOTFOUND) {
 		res = PQexecPrepared(conn, "model_add", 2, param, NULL, NULL, 0);
 		if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
 		PQclear(res);
-	} else {
+	} else if (!ret) {
 		res = PQexecPrepared(conn, "model_set", 2, param, NULL, NULL, 0);
 		if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
 		PQclear(res);
+	} else {
+		return ret;
 	}
 
 	return OK;
@@ -278,19 +260,16 @@ fail:
 	return -EDB;
 }
 
-int db_model_zap(db_hand **hand) {
+int db_model_zap(brain_t brain) {
 	PGresult *res;
 	const char *param[1];
-	struct db_hand_postgres *hand_p;
+	char tmp[1][32];
 
-	if (hand == NULL || *hand == NULL) return -EINVAL;
-	hand_p = *hand;
-	if (db_connect()) {
-		db_model_free(hand);
+	if (brain == 0) return -EINVAL;
+	if (db_connect())
 		return -EDB;
-	}
 
-	param[0] = hand_p->brain;
+	SET_PARAM(param, tmp, 0, brain);
 
 	res = PQexecPrepared(conn, "model_zap", 1, param, NULL, NULL, 0);
 	if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
@@ -320,55 +299,26 @@ db_tree *db_model_node_alloc(void) {
 	return node;
 }
 
-int db_model_node_fill(db_hand **hand, db_tree *node) {
+int db_model_node_fill(brain_t brain, db_tree *node) {
 	PGresult *res;
-	const char *param[1];
-	struct db_hand_postgres *hand_p;
-	char tmp0[32];
+	const char *param[2];
+	char tmp[2][32];
 
-	if (hand == NULL || *hand == NULL || node == NULL) return -EINVAL;
-	hand_p = *hand;
-	if (db_connect()) {
-		db_model_free(hand);
+	if (brain == 0 || node == NULL) return -EINVAL;
+	if (db_connect())
 		return -EDB;
-	}
 
-	param[0] = tmp0;
-	if (sizeof(node_t) == sizeof(unsigned long int)) {
-		if (sprintf(tmp0, "%lu", (unsigned long int)node->id) <= 0) return -EFAULT;
-	} else if (sizeof(node_t) == sizeof(unsigned long long int)) {
-		if (sprintf(tmp0, "%llu", (unsigned long long int)node->id) <= 0) return -EFAULT;
-	} else {
-		return -EFAULT;
-	}
+	SET_PARAM(param, tmp, 0, brain);
+	SET_PARAM(param, tmp, 1, node->id);
 
-	res = PQexecPrepared(conn, "model_node_get", 1, param, NULL, NULL, 0);
+	res = PQexecPrepared(conn, "model_node_get", 2, param, NULL, NULL, 0);
 	if (PQresultStatus(res) != PGRES_TUPLES_OK) goto fail;
 	if (PQntuples(res) == 0) goto not_found;
 
-	if (sizeof(word_t) == sizeof(unsigned long int)) {
-		node->word = strtoul(PQgetvalue(res, 0, 0), NULL, 10);
-	} else if (sizeof(word_t) == sizeof(unsigned long long int)) {
-		node->word = strtoull(PQgetvalue(res, 0, 0), NULL, 10);
-	} else {
-		return -EFAULT;
-	}
+	GET_VALUE(res, 0, 0, node->word);
+	GET_VALUE(res, 0, 1, node->usage);
+	GET_VALUE(res, 0, 2, node->count);
 
-	if (sizeof(number_t) == sizeof(unsigned long int)) {
-		node->usage = strtoul(PQgetvalue(res, 0, 1), NULL, 10);
-	} else if (sizeof(number_t) == sizeof(unsigned long long int)) {
-		node->usage = strtoull(PQgetvalue(res, 0, 1), NULL, 10);
-	} else {
-		return -EFAULT;
-	}
-
-	if (sizeof(number_t) == sizeof(unsigned long int)) {
-		node->count = strtoul(PQgetvalue(res, 0, 2), NULL, 10);
-	} else if (sizeof(number_t) == sizeof(unsigned long long int)) {
-		node->count = strtoull(PQgetvalue(res, 0, 2), NULL, 10);
-	} else {
-		return -EFAULT;
-	}
 	PQclear(res);
 
 	return OK;
@@ -383,28 +333,24 @@ not_found:
 	return -ENOTFOUND;
 }
 
-int db_model_get_root(db_hand **hand, db_tree **forward, db_tree **backward) {
+int db_model_get_root(brain_t brain, db_tree **forward, db_tree **backward) {
 	PGresult *res;
 	const char *param[3];
-	struct db_hand_postgres *hand_p;
+	char tmp[3][32];
 	db_tree *forward_p;
 	db_tree *backward_p;
-	char tmp1[32];
-	char tmp2[32];
 	int created = 0;
 	int ret;
 
-	if (hand == NULL || *hand == NULL || forward == NULL || backward == NULL) return -EINVAL;
-	hand_p = *hand;
-	if (db_connect()) {
-		db_model_free(hand);
+	if (brain == 0 || forward == NULL || backward == NULL) return -EINVAL;
+	if (db_connect())
 		return -EDB;
-	}
 
 	*forward = NULL;
 	*backward = NULL;
 
-	param[0] = hand_p->brain;
+	SET_PARAM(param, tmp, 0, brain);
+
 	res = PQexecPrepared(conn, "model_root_get", 1, param, NULL, NULL, 0);
 	if (PQresultStatus(res) != PGRES_TUPLES_OK) goto fail;
 	if (PQntuples(res) == 0) goto fail;
@@ -414,18 +360,12 @@ int db_model_get_root(db_hand **hand, db_tree **forward, db_tree **backward) {
 		if (*forward == NULL) return -ENOMEM;
 		forward_p = *forward;
 
-		if (sizeof(number_t) == sizeof(unsigned long int)) {
-			forward_p->id = strtoul(PQgetvalue(res, 0, 0), NULL, 10);
-		} else if (sizeof(number_t) == sizeof(unsigned long long int)) {
-			forward_p->id = strtoull(PQgetvalue(res, 0, 0), NULL, 10);
-		} else {
-			return -EFAULT;
-		}
+		GET_VALUE(res, 0, 0, forward_p->id);
 
-		ret = db_model_node_fill(hand, forward_p);
+		ret = db_model_node_fill(brain, forward_p);
 		if (ret) goto fail;
 	} else {
-		ret = db_model_create(hand, forward);
+		ret = db_model_create(brain, forward);
 		if (ret) goto fail;
 
 		forward_p = *forward;
@@ -437,18 +377,12 @@ int db_model_get_root(db_hand **hand, db_tree **forward, db_tree **backward) {
 		if (*backward == NULL) return -ENOMEM;
 		backward_p = *backward;
 
-		if (sizeof(number_t) == sizeof(unsigned long int)) {
-			backward_p->id = strtoul(PQgetvalue(res, 0, 1), NULL, 10);
-		} else if (sizeof(number_t) == sizeof(unsigned long long int)) {
-			backward_p->id = strtoull(PQgetvalue(res, 0, 1), NULL, 10);
-		} else {
-			return -EFAULT;
-		}
+		GET_VALUE(res, 0, 1, backward_p->id);
 
-		ret = db_model_node_fill(hand, backward_p);
+		ret = db_model_node_fill(brain, backward_p);
 		if (ret) goto fail;
 	} else {
-		ret = db_model_create(hand, backward);
+		ret = db_model_create(brain, backward);
 		if (ret) goto fail;
 
 		backward_p = *backward;
@@ -457,23 +391,8 @@ int db_model_get_root(db_hand **hand, db_tree **forward, db_tree **backward) {
 	PQclear(res);
 
 	if (created) {
-		param[1] = tmp1;
-		if (sizeof(node_t) == sizeof(unsigned long int)) {
-			if (sprintf(tmp1, "%lu", (unsigned long int)forward_p->id) <= 0) return -EFAULT;
-		} else if (sizeof(node_t) == sizeof(unsigned long long int)) {
-			if (sprintf(tmp1, "%llu", (unsigned long long int)forward_p->id) <= 0) return -EFAULT;
-		} else {
-			return -EFAULT;
-		}
-
-		param[2] = tmp2;
-		if (sizeof(node_t) == sizeof(unsigned long int)) {
-			if (sprintf(tmp2, "%lu", (unsigned long int)backward_p->id) <= 0) return -EFAULT;
-		} else if (sizeof(node_t) == sizeof(unsigned long long int)) {
-			if (sprintf(tmp2, "%llu", (unsigned long long int)backward_p->id) <= 0) return -EFAULT;
-		} else {
-			return -EFAULT;
-		}
+		SET_PARAM(param, tmp, 1, forward_p->id);
+		SET_PARAM(param, tmp, 2, backward_p->id);
 
 		res = PQexecPrepared(conn, "model_root_set", 3, param, NULL, NULL, 0);
 		if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
@@ -490,24 +409,21 @@ fail:
 	return -EDB;
 }
 
-int db_model_create(db_hand **hand, db_tree **node) {
+int db_model_create(brain_t brain, db_tree **node) {
 	PGresult *res;
 	const char *param[1];
-	struct db_hand_postgres *hand_p;
+	char tmp[1][32];
 	db_tree *node_p;
 
-	if (hand == NULL || *hand == NULL || node == NULL) return -EINVAL;
-	hand_p = *hand;
-	if (db_connect()) {
-		db_model_free(hand);
+	if (brain == 0 || node == NULL) return -EINVAL;
+	if (db_connect())
 		return -EDB;
-	}
 
 	*node = db_model_node_alloc();
 	if (*node == NULL) return -ENOMEM;
 	node_p = *node;
 
-	param[0] = hand_p->brain;
+	SET_PARAM(param, tmp, 0, brain);
 
 	res = PQexecPrepared(conn, "model_create", 1, param, NULL, NULL, 0);
 	if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
@@ -517,13 +433,8 @@ int db_model_create(db_hand **hand, db_tree **node) {
 	if (PQresultStatus(res) != PGRES_TUPLES_OK) goto fail;
 	if (PQntuples(res) != 1) goto fail;
 
-	if (sizeof(word_t) == sizeof(unsigned long int)) {
-		node_p->id = strtoul(PQgetvalue(res, 0, 0), NULL, 10);
-	} else if (sizeof(word_t) == sizeof(unsigned long long int)) {
-		node_p->id = strtoull(PQgetvalue(res, 0, 0), NULL, 10);
-	} else {
-		return -EFAULT;
-	}
+	GET_VALUE(res, 0, 0, node_p->id);
+
 	PQclear(res);
 
 	return OK;
@@ -535,74 +446,30 @@ fail:
 	return -EDB;
 }
 
-int db_model_update(db_hand **hand, db_tree *node) {
+int db_model_update(brain_t brain, db_tree *node) {
 	PGresult *res;
 	const char *param[5];
-	struct db_hand_postgres *hand_p;
-	char tmp0[32];
-	char tmp1[32];
-	char tmp2[32];
-	char tmp3[32];
-	char tmp4[32];
+	char tmp[5][32];
 
-	if (hand == NULL || *hand == NULL || node == NULL) return -EINVAL;
-	hand_p = *hand;
-	if (db_connect()) {
-		db_model_free(hand);
+	if (brain == 0 || node == NULL) return -EINVAL;
+	if (db_connect())
 		return -EDB;
-	}
 
 	if (node->id == 0) {
-		param[0] = hand_p->brain;
+		SET_PARAM(param, tmp, 0, brain);
 	} else {
-		param[0] = tmp0;
-		if (sizeof(node_t) == sizeof(unsigned long int)) {
-			if (sprintf(tmp0, "%lu", (unsigned long int)node->id) <= 0) return -EFAULT;
-		} else if (sizeof(node_t) == sizeof(unsigned long long int)) {
-			if (sprintf(tmp0, "%llu", (unsigned long long int)node->id) <= 0) return -EFAULT;
-		} else {
-			return -EFAULT;
-		}
+		SET_PARAM(param, tmp, 0, node->id);
 	}
 
-	param[1] = tmp1;
-	if (sizeof(number_t) == sizeof(unsigned long int)) {
-		if (sprintf(tmp1, "%lu", (unsigned long int)node->usage) <= 0) return -EFAULT;
-	} else if (sizeof(number_t) == sizeof(unsigned long long int)) {
-		if (sprintf(tmp1, "%llu", (unsigned long long int)node->usage) <= 0) return -EFAULT;
-	} else {
-		return -EFAULT;
-	}
-
-	param[2] = tmp2;
-	if (sizeof(number_t) == sizeof(unsigned long int)) {
-		if (sprintf(tmp2, "%lu", (unsigned long int)node->count) <= 0) return -EFAULT;
-	} else if (sizeof(number_t) == sizeof(unsigned long long int)) {
-		if (sprintf(tmp2, "%llu", (unsigned long long int)node->count) <= 0) return -EFAULT;
-	} else {
-		return -EFAULT;
-	}
+	SET_PARAM(param, tmp, 1, node->usage);
+	SET_PARAM(param, tmp, 2, node->count);
 
 	if (node->id == 0 || node->parent_id == 0) {
-		param[3] = tmp3;
-		if (sizeof(word_t) == sizeof(unsigned long int)) {
-			if (sprintf(tmp3, "%lu", (unsigned long int)node->word) <= 0) return -EFAULT;
-		} else if (sizeof(word_t) == sizeof(unsigned long long int)) {
-			if (sprintf(tmp3, "%llu", (unsigned long long int)node->word) <= 0) return -EFAULT;
-		} else {
-			return -EFAULT;
-		}
+		SET_PARAM(param, tmp, 3, node->word);
 	}
 
 	if (node->id == 0) {
-		param[4] = tmp4;
-		if (sizeof(word_t) == sizeof(unsigned long int)) {
-			if (sprintf(tmp4, "%lu", (unsigned long int)node->parent_id) <= 0) return -EFAULT;
-		} else if (sizeof(word_t) == sizeof(unsigned long long int)) {
-			if (sprintf(tmp4, "%llu", (unsigned long long int)node->parent_id) <= 0) return -EFAULT;
-		} else {
-			return -EFAULT;
-		}
+		SET_PARAM(param, tmp, 4, node->parent_id);
 	}
 
 	if (node->id == 0) {
@@ -614,13 +481,8 @@ int db_model_update(db_hand **hand, db_tree *node) {
 		if (PQresultStatus(res) != PGRES_TUPLES_OK) goto fail;
 		if (PQntuples(res) != 1) goto fail;
 
-		if (sizeof(word_t) == sizeof(unsigned long int)) {
-			node->id = strtoul(PQgetvalue(res, 0, 0), NULL, 10);
-		} else if (sizeof(word_t) == sizeof(unsigned long long int)) {
-			node->id = strtoull(PQgetvalue(res, 0, 0), NULL, 10);
-		} else {
-			return -EFAULT;
-		}
+		GET_VALUE(res, 0, 0, node->id);
+
 		PQclear(res);
 	} else if (node->parent_id == 0) {
 		res = PQexecPrepared(conn, "model_rootupdate", 4, param, NULL, NULL, 0);

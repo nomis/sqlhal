@@ -40,15 +40,13 @@ typedef struct {
 	struct db_tree **nodes;
 } db_tree;
 
-int db_model_init(db_hand **hand, brain_t brain);                  /* create table, prepare statements */
-int db_model_free(db_hand **hand);                                 /* deallocates prepared statements */
-int db_model_zap(db_hand **hand);                                  /* clears table */
-int db_model_get_order(db_hand **hand, number_t *order);           /* get model order (may return -ENOTFOUND) */
-int db_model_set_order(db_hand **hand, number_t order);            /* set model order (required) */
+int db_model_zap(brain_t brain);                                   /* clears table */
+int db_model_get_order(brain_t brain, number_t *order);            /* get model order (may return -ENOTFOUND) */
+int db_model_set_order(brain_t brain, number_t order);             /* set model order (required) */
 
-int db_model_get_root(db_hand **hand, db_tree **forward, db_tree **backward); /* get or create forward/backward nodes */
-db_tree *db_model_node_alloc(void);                                           /* allocate node for creation on first update */
-int db_model_create(db_hand **hand, db_tree **node);                          /* create node */
-int db_model_update(db_hand **hand, db_tree *node);                           /* update node */
-int db_model_link(db_tree *parent, db_tree *child);                           /* add node to tree */
-void db_model_node_free(db_tree **node);                                      /* free node data (recursively) */
+int db_model_get_root(brain_t brain, db_tree **forward, db_tree **backward); /* get or create forward/backward nodes */
+db_tree *db_model_node_alloc(void);                                          /* allocate node for creation on first update */
+int db_model_create(brain_t brain, db_tree **node);                          /* create node */
+int db_model_update(brain_t brain, db_tree *node);                           /* update node */
+int db_model_link(db_tree *parent, db_tree *child);                          /* add node to tree */
+void db_model_node_free(db_tree **node);                                     /* free node data (recursively) */
