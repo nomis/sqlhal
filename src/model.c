@@ -12,9 +12,7 @@
 
 enum load_mode {
 	LOAD_IGNORE,
-	LOAD_FORWARD,
-	LOAD_BACKWARD,
-	LOAD_APPEND
+	LOAD_STORE
 };
 
 int load_tree(FILE *fd, enum load_mode mode, uint32_t dict_size, word_t *dict_words, brain_t brain, db_tree *tree) {
@@ -47,15 +45,14 @@ int load_tree(FILE *fd, enum load_mode mode, uint32_t dict_size, word_t *dict_wo
 	if (branch == 0) return OK;
 
 	switch (mode) {
-		case LOAD_FORWARD:
-		case LOAD_BACKWARD:
+		case LOAD_STORE:
 			if (dict_words == NULL || brain == 0 || tree == NULL)
 				return -EINVAL;
 		case LOAD_IGNORE:
 			for (i = 0; i < branch; i++) {
 				db_tree *node = NULL;
 
-				if (tree != NULL) {
+				if (mode == LOAD_STORE) {
 					node = db_model_node_alloc();
 					if (node == NULL) return -ENOMEM;
 
@@ -66,13 +63,11 @@ int load_tree(FILE *fd, enum load_mode mode, uint32_t dict_size, word_t *dict_wo
 				ret = load_tree(fd, mode, dict_size, dict_words, brain, node);
 				if (ret) return ret;
 
-				if (tree != NULL) {
+				if (mode == LOAD_STORE) {
 					db_model_node_free(&node);
 				}
 			}
 			return OK;
-		case LOAD_APPEND:
-			break;
 	}
 
 	return -EFAULT;
@@ -195,14 +190,14 @@ int load_brain(char *name, const char *filename) {
 	/* Read most of the file again... */
 	if (fseek(fd, sizeof(char) * strlen(COOKIE) + sizeof(tmp8), SEEK_SET)) return -EIO;
 
-	ret = load_tree(fd, LOAD_FORWARD, dict_size, dict_words, brain, forward);
+	ret = load_tree(fd, LOAD_STORE, dict_size, dict_words, brain, forward);
 	if (ret) goto fail;
 
 	db_model_node_free(&forward);
 
 	log_info("load_brain", 0, "Forward tree loaded");
 
-	ret = load_tree(fd, LOAD_BACKWARD, dict_size, dict_words, brain, backward);
+	ret = load_tree(fd, LOAD_STORE, dict_size, dict_words, brain, backward);
 	if (ret) goto fail;
 
 	db_model_node_free(&backward);
