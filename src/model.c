@@ -153,7 +153,7 @@ int load_brain(char *name, const char *filename) {
 	ret = db_model_zap(brain);
 	if (ret) goto fail;
 
-	if (!fread(cookie, sizeof(char), strlen(COOKIE), fd)) return -EIO;
+	if (fread(cookie, sizeof(char), strlen(COOKIE), fd) != strlen(COOKIE)) return -EIO;
 	if (strncmp(cookie, COOKIE, strlen(COOKIE)) != 0) {
 		log_error("load_brain", 1, "Not a MegaHAL brain");
 		ret = -EIO;
