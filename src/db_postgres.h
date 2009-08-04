@@ -25,6 +25,7 @@ PGconn *conn;
 		lvalue = strtoull(PQgetvalue(res, tup_num, field_num), NULL, 10); \
 	} else { \
 		log_fatal("SET_PARAM", sizeof(lvalue), "Unhandled numeric sizeof"); \
+		PQclear(res); \
 		return -EFAULT; \
 	} \
 } while(0)
