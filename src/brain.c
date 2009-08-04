@@ -10,7 +10,7 @@
 #include "model.h"
 #include "output.h"
 
-int do_list(const char *name, const char *prefix, const char *suffix, enum list type) {
+int input_list(const char *name, const char *prefix, const char *suffix, enum list type) {
 	char *filename;
 	int ret;
 
@@ -22,7 +22,7 @@ int do_list(const char *name, const char *prefix, const char *suffix, enum list 
 	return ret;
 }
 
-int do_map(const char *name, const char *prefix, const char *suffix, enum map type) {
+int output_list(const char *name, const char *prefix, const char *suffix, enum list type) {
 	char *filename;
 	int ret;
 
@@ -30,11 +30,35 @@ int do_map(const char *name, const char *prefix, const char *suffix, enum map ty
 	if (filename == NULL) return -ENOMEM;
 	if (sprintf(filename, "%s.%s", prefix, suffix) <= 0) return -EFAULT;
 
-	ret = load_map(name, type, filename);
+	ret = save_list(name, type, filename);
 	return ret;
 }
 
-int do_brain(const char *name, const char *prefix) {
+int input_map(const char *name, const char *prefix, const char *suffix, enum map type) {
+	char *filename;
+	int ret;
+
+	filename = malloc((strlen(prefix) + 1 + strlen(suffix) + 1) * sizeof(char));
+	if (filename == NULL) return -ENOMEM;
+	if (sprintf(filename, "%s.%s", prefix, suffix) <= 0) return -EFAULT;
+
+	ret = save_map(name, type, filename);
+	return ret;
+}
+
+int output_map(const char *name, const char *prefix, const char *suffix, enum map type) {
+	char *filename;
+	int ret;
+
+	filename = malloc((strlen(prefix) + 1 + strlen(suffix) + 1) * sizeof(char));
+	if (filename == NULL) return -ENOMEM;
+	if (sprintf(filename, "%s.%s", prefix, suffix) <= 0) return -EFAULT;
+
+	ret = save_map(name, type, filename);
+	return ret;
+}
+
+int input_brain(const char *name, const char *prefix) {
 	char *filename;
 	int ret;
 
@@ -43,6 +67,18 @@ int do_brain(const char *name, const char *prefix) {
 	if (sprintf(filename, "%s.brn", prefix) <= 0) return -EFAULT;
 
 	ret = load_brain(name, filename);
+	return ret;
+}
+
+int output_brain(const char *name, const char *prefix) {
+	char *filename;
+	int ret;
+
+	filename = malloc((strlen(prefix) + 1 + 3 + 1) * sizeof(char));
+	if (filename == NULL) return -ENOMEM;
+	if (sprintf(filename, "%s.brn", prefix) <= 0) return -EFAULT;
+
+	ret = save_brain(name, filename);
 	return ret;
 }
 
@@ -76,32 +112,55 @@ int main(int argc, char *argv[]) {
 	else log_info("brain", ret, state);
 
 	if (!strcmp(action, "load")) {
-		state = "do_list aux";
-		ret = do_list(name, prefix, "aux", LIST_AUX);
+		state = "input_list aux";
+		ret = input_list(name, prefix, "aux", LIST_AUX);
 		if (ret) { log_warn("brain", ret, state); fail = 1; }
 		else log_info("brain", ret, state);
 
-		state = "do_list ban";
-		ret = do_list(name, prefix, "ban", LIST_BAN);
+		state = "input_list ban";
+		ret = input_list(name, prefix, "ban", LIST_BAN);
 		if (ret) { log_warn("brain", ret, state); fail = 1; }
 		else log_info("brain", ret, state);
 
-		state = "do_list grt";
-		ret = do_list(name, prefix, "grt", LIST_GREET);
+		state = "input_list grt";
+		ret = input_list(name, prefix, "grt", LIST_GREET);
 		if (ret) { log_warn("brain", ret, state); fail = 1; }
 		else log_info("brain", ret, state);
 
-		state = "do_map swp";
-		ret = do_map(name, prefix, "swp", MAP_SWAP);
+		state = "input_map swp";
+		ret = input_map(name, prefix, "swp", MAP_SWAP);
 		if (ret) { log_warn("brain", ret, state); fail = 1; }
 		else log_info("brain", ret, state);
 
-		state = "do_brain";
-		ret = do_brain(name, prefix);
+		state = "input_brain";
+		ret = input_brain(name, prefix);
 		if (ret) { log_warn("brain", ret, state); fail = 1; }
 		else log_info("brain", ret, state);
 	} else if (!strcmp(action, "save")) {
-		fail = 1;
+		state = "output_list aux";
+		ret = output_list(name, prefix, "aux", LIST_AUX);
+		if (ret) { log_warn("brain", ret, state); fail = 1; }
+		else log_info("brain", ret, state);
+
+		state = "output_list ban";
+		ret = output_list(name, prefix, "ban", LIST_BAN);
+		if (ret) { log_warn("brain", ret, state); fail = 1; }
+		else log_info("brain", ret, state);
+
+		state = "output_list grt";
+		ret = output_list(name, prefix, "grt", LIST_GREET);
+		if (ret) { log_warn("brain", ret, state); fail = 1; }
+		else log_info("brain", ret, state);
+
+		state = "output_map swp";
+		ret = output_map(name, prefix, "swp", MAP_SWAP);
+		if (ret) { log_warn("brain", ret, state); fail = 1; }
+		else log_info("brain", ret, state);
+
+		state = "output_brain";
+		ret = output_brain(name, prefix);
+		if (ret) { log_warn("brain", ret, state); fail = 1; }
+		else log_info("brain", ret, state);
 	} else {
 		fail = 1;
 	}

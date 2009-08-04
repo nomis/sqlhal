@@ -48,6 +48,27 @@ fail:
 	return ret;
 }
 
+int save_list(const char *name, enum list type, const char *filename) {
+	FILE *fd;
+	int ret = OK;
+	brain_t brain;
+
+	if (name == NULL || filename == NULL) return -EINVAL;
+
+	fd = fopen(filename, "w");
+	if (fd == NULL) return -EIO;
+
+	ret = db_brain_get(name, &brain);
+	if (ret) goto fail;
+
+	(void)type;
+	return -EFAULT; // TODO
+
+fail:
+	fclose(fd);
+	return ret;
+}
+
 int load_map(const char *name, enum map type, const char *filename) {
 	FILE *fd;
 	char buffer[1024];
@@ -89,6 +110,27 @@ int load_map(const char *name, enum map type, const char *filename) {
 			if (ret) goto fail;
 		}
 	}
+
+fail:
+	fclose(fd);
+	return ret;
+}
+
+int save_map(const char *name, enum map type, const char *filename) {
+	FILE *fd;
+	int ret = OK;
+	brain_t brain;
+
+	if (name == NULL || filename == NULL) return -EINVAL;
+
+	fd = fopen(filename, "w");
+	if (fd == NULL) return -EIO;
+
+	ret = db_brain_get(name, &brain);
+	if (ret) goto fail;
+
+	(void)type;
+	return -EFAULT; // TODO
 
 fail:
 	fclose(fd);

@@ -133,6 +133,61 @@ void free_loaded_dict(uint_fast32_t *dict_size, word_t **dict_words) {
 	*dict_words = NULL;
 }
 
+int read_dict(brain_t brain, uint_fast32_t *dict_size, word_t **dict_words, char ***dict_text) {
+	uint_fast32_t i;
+	(void)brain;
+
+	i = TOKENS;
+
+	*dict_words = malloc(sizeof(word_t) * i);
+	if (*dict_words == NULL) return -ENOMEM;
+
+	*dict_text = malloc(sizeof(char *) * i);
+	if (*dict_text == NULL) return -ENOMEM;
+
+	(*dict_words)[TOKEN_ERROR_IDX] = 0;
+	(*dict_text)[TOKEN_ERROR_IDX] = TOKEN_ERROR;
+
+	(*dict_words)[TOKEN_FIN_IDX] = 0;
+	(*dict_text)[TOKEN_FIN_IDX] = TOKEN_FIN;
+
+
+
+	*dict_size = i;
+
+	return OK;
+}
+
+int save_dict(FILE *fd, uint_fast32_t dict_size, char **dict_text) {
+	uint8_t length;
+	uint32_t _dict_size;
+	uint_fast32_t i;
+
+	if (!fwrite(&_dict_size, sizeof(_dict_size), 1, fd)) return -EIO;
+
+	for (i = 0; i < dict_size; i++) {
+		length = strlen(dict_text[i]);
+		if (!fwrite(&length, sizeof(length), 1, fd)) return -EIO;
+		if (fwrite(dict_text[i], sizeof(char), length, fd) != length) return -EIO;
+	}
+
+	return OK;
+}
+
+void free_saved_dict(uint_fast32_t *dict_size, word_t **dict_words, char ***dict_text) {
+	uint_fast32_t i;
+
+	for (i = TOKENS; i < *dict_size; i++)
+		free((*dict_text)[i]);
+
+	free(*dict_words);
+	free(*dict_text);
+
+	*dict_size = 0;
+	*dict_words = NULL;
+	*dict_text = NULL;
+}
+
 int load_brain(char *name, const char *filename) {
 	FILE *fd;
 	int ret = OK;
@@ -210,6 +265,63 @@ int load_brain(char *name, const char *filename) {
 	log_info("load_brain", 0, "Backward tree loaded");
 
 	free_loaded_dict(&dict_size, &dict_words);
+
+fail:
+	fclose(fd);
+	return ret;
+}
+
+int save_brain(char *name, const char *filename) {
+	FILE *fd;
+	int ret = OK;
+	brain_t brain;
+	number_t order;
+	uint_fast32_t dict_size;
+	word_t *dict_words;
+	char **dict_text;
+	db_tree *forward;
+	db_tree *backward;
+
+	if (name == NULL || filename == NULL) return -EINVAL;
+
+	log_info("save_brain", 0, filename);
+
+	fd = fopen(filename, "w");
+	if (fd == NULL) return -EIO;
+
+	ret = db_brain_get(name, &brain);
+	if (ret) goto fail;
+
+	ret = db_model_get_order(brain, &order);
+	if (ret) goto fail;
+
+	ret = db_model_get_root(brain, &forward, &backward);
+	if (ret) goto fail;
+
+	ret = read_dict(brain, &dict_size, &dict_words, &dict_text);
+	if (ret) goto fail;
+
+	log_info("save_brain", dict_size, "Dictionary read");
+
+	if (fwrite(COOKIE, sizeof(char), strlen(COOKIE), fd) != strlen(COOKIE)) return -EIO;
+	if (!fwrite(&order, sizeof(order), 1, fd)) return -EIO;
+#if 0
+	ret = save_tree(fd, dict_size, dict_words, brain, forward); /* forward */
+	if (ret) goto fail;
+
+	log_info("save_brain", 0, "Forward tree saved");
+
+	ret = save_tree(fd, dict_size, dict_words, brain, backward); /* backward */
+	if (ret) goto fail;
+
+	log_info("save_brain", 0, "Backward tree saved");
+#endif
+	ret = save_dict(fd, dict_size, dict_text);
+	if (ret) goto fail;
+
+	log_info("save_brain", dict_size, "Dictionary saved");
+
+	free_saved_dict(&dict_size, &dict_words, &dict_text);
 
 fail:
 	fclose(fd);
