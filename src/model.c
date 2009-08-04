@@ -9,6 +9,11 @@
 #include "output.h"
 
 #define COOKIE "MegaHALv8"
+#define TOKENS 2
+#define TOKEN_ERROR_IDX 0
+#define TOKEN_ERROR "<ERROR>"
+#define TOKEN_FIN_IDX 1
+#define TOKEN_FIN "<FIN>"
 
 enum load_mode {
 	LOAD_IGNORE,
@@ -94,17 +99,17 @@ int load_dict(FILE *fd, uint32_t *dict_size, word_t **dict_words) {
 		if (fread(tmp, sizeof(char), length, fd) != length) return -EIO;
 
 		switch (i) {
-		case 0:
-			if (strcmp(tmp, "<ERROR>")) {
-				log_error("load_dict", i, "Invalid word 0 (not <ERROR>)");
+		case TOKEN_ERROR_IDX:
+			if (strcmp(tmp, TOKEN_ERROR)) {
+				log_error("load_dict", i, "Invalid word (not " TOKEN_ERROR ")");
 				return -EINVAL;
 			}
 			(*dict_words)[i] = 0;
 			break;
 
-		case 1:
-			if (strcmp(tmp, "<FIN>")) {
-				log_error("load_dict", i, "Invalid word 1 (not <FIN>)");
+		case TOKEN_FIN_IDX:
+			if (strcmp(tmp, TOKEN_FIN)) {
+				log_error("load_dict", i, "Invalid word (not " TOKEN_FIN ")");
 				return -EINVAL;
 			}
 			(*dict_words)[i] = 0;
