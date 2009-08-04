@@ -98,10 +98,29 @@ int load_dict(FILE *fd, uint32_t *dict_size, word_t **dict_words) {
 		tmp[length] = 0;
 		if (fread(tmp, sizeof(char), length, fd) != length) return -EIO;
 
-		ret = db_word_use(tmp, &word);
-		if (ret) return ret;
+		switch (i) {
+		case 0:
+			if (strcmp(tmp, "<ERROR>")) {
+				log_error("load_dict", i, "Invalid word 0 (not <ERROR>)");
+				return -EINVAL;
+			}
+			(*dict_words)[i] = 0;
+			break;
 
-		(*dict_words)[i] = word;
+		case 1:
+			if (strcmp(tmp, "<FIN>")) {
+				log_error("load_dict", i, "Invalid word 1 (not <FIN>)");
+				return -EINVAL;
+			}
+			(*dict_words)[i] = 0;
+			break;
+
+		default:
+			ret = db_word_use(tmp, &word);
+			if (ret) return ret;
+
+			(*dict_words)[i] = word;
+		}
 	}
 
 	return OK;

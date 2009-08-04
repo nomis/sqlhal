@@ -125,7 +125,9 @@ int db_connect(void) {
 					" FOREIGN KEY (word) REFERENCES words (id) ON UPDATE CASCADE ON DELETE CASCADE,"\
 					" CONSTRAINT valid_id CHECK (id > 0),"\
 					" CONSTRAINT valid_usage CHECK (usage >= 0),"\
-					" CONSTRAINT valid_count CHECK (count >= 0))");
+					" CONSTRAINT valid_count CHECK (count >= 0),"\
+					" CONSTRAINT valid_root CHECK (parent IS NOT NULL OR word IS NULL),"\
+					" CONSTRAINT valid_fin CHECK (parent IS NULL OR word IS NOT NULL OR usage = 0))");
 				if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
 				PQclear(res);
 
@@ -248,7 +250,7 @@ int db_connect(void) {
 			if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
 			PQclear(res);
 
-			res = PQprepare(conn, "model_rootupdate", "UPDATE nodes SET parent = NULL, usage = $2, count = $3, word = $4 WHERE id = $1", 4, NULL);
+			res = PQprepare(conn, "model_rootupdate", "UPDATE nodes SET parent = NULL, usage = $2, count = $3 WHERE id = $1", 3, NULL);
 			if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
 			PQclear(res);
 

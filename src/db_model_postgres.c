@@ -282,15 +282,18 @@ int db_model_update(brain_t brain, db_tree *node) {
 	SET_PARAM(param, tmp, 1, node->usage);
 	SET_PARAM(param, tmp, 2, node->count);
 
-	if (node->id == 0 || node->parent_id == 0) {
-		SET_PARAM(param, tmp, 3, node->word);
-	}
-
-	if (node->id == 0) {
+	if (node->parent_id == 0) {
+		res = PQexecPrepared(conn, "model_rootupdate", 3, param, NULL, NULL, 0);
+		if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
+		PQclear(res);
+	} else if (node->id == 0) {
+		if (node->word == 0) {
+			param[3] = NULL;
+		} else {
+			SET_PARAM(param, tmp, 3, node->word);
+		}
 		SET_PARAM(param, tmp, 4, node->parent_id);
-	}
 
-	if (node->id == 0) {
 		res = PQexecPrepared(conn, "model_fastcreate", 5, param, NULL, NULL, 0);
 		if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
 		PQclear(res);
@@ -301,10 +304,6 @@ int db_model_update(brain_t brain, db_tree *node) {
 
 		GET_VALUE(res, 0, 0, node->id);
 
-		PQclear(res);
-	} else if (node->parent_id == 0) {
-		res = PQexecPrepared(conn, "model_rootupdate", 4, param, NULL, NULL, 0);
-		if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
 		PQclear(res);
 	} else {
 		res = PQexecPrepared(conn, "model_update", 3, param, NULL, NULL, 0);
@@ -324,6 +323,7 @@ int db_model_link(db_tree *parent, db_tree *child) {
 	if (parent == NULL || child == NULL) return -EINVAL;
 	if (parent->id == 0) return -EINVAL;
 	if (child->parent_id != 0) return -EINVAL;
+	if (parent->parent_id != 0 && parent->word == 0) return -EINVAL;
 
 	child->parent_id = parent->id;
 	return OK;
