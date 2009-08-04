@@ -7,15 +7,14 @@
 #include "types.h"
 #include "db.h"
 
-int load_list(const char *name, const char *type, const char *filename) {
+int load_list(const char *name, enum list type, const char *filename) {
 	FILE *fd;
 	char buffer[1024];
 	char *string;
 	int ret = OK;
-	db_hand *hand;
 	brain_t brain;
 
-	if (name == NULL || type == NULL || filename == NULL) return -EINVAL;
+	if (name == NULL || filename == NULL) return -EINVAL;
 
 	fd = fopen(filename, "r");
 	if (fd == NULL) return -EIO;
@@ -23,10 +22,7 @@ int load_list(const char *name, const char *type, const char *filename) {
 	ret = db_brain_use(name, &brain);
 	if (ret) goto fail;
 
-	ret = db_list_init(type, &hand, brain);
-	if (ret) goto fail;
-
-	ret = db_list_zap(&hand);
+	ret = db_list_zap(brain, type);
 	if (ret) goto fail;
 
 	while (!feof(fd)) {
@@ -40,30 +36,27 @@ int load_list(const char *name, const char *type, const char *filename) {
 			ret = db_word_use(string, &word);
 			if (ret) goto fail;
 
-			ret = db_list_contains(&hand, &word);
+			ret = db_list_contains(brain, type, word);
 			if (ret == -ENOTFOUND)
-				ret = db_list_add(&hand, &word);
+				ret = db_list_add(brain, type, word);
 			if (ret) goto fail;
 		}
 	}
-
-	ret = db_list_free(&hand);
 
 fail:
 	fclose(fd);
 	return ret;
 }
 
-int load_map(const char *name, const char *type, const char *filename) {
+int load_map(const char *name, enum map type, const char *filename) {
 	FILE *fd;
 	char buffer[1024];
 	char *from;
 	char *to;
 	int ret = OK;
-	db_hand *hand;
 	brain_t brain;
 
-	if (name == NULL || type == NULL || filename == NULL) return -EINVAL;
+	if (name == NULL || filename == NULL) return -EINVAL;
 
 	fd = fopen(filename, "r");
 	if (fd == NULL) return -EIO;
@@ -71,10 +64,7 @@ int load_map(const char *name, const char *type, const char *filename) {
 	ret = db_brain_use(name, &brain);
 	if (ret) goto fail;
 
-	ret = db_map_init(type, &hand, brain);
-	if (ret) goto fail;
-
-	ret = db_map_zap(&hand);
+	ret = db_map_zap(brain, type);
 	if (ret) goto fail;
 
 	while (!feof(fd)) {
@@ -93,12 +83,12 @@ int load_map(const char *name, const char *type, const char *filename) {
 			ret = db_word_use(to, &value);
 			if (ret) goto fail;
 
-			ret = db_map_use(&hand, &key, &value);
+			ret = db_map_get(brain, type, key, &value);
+			if (ret == -ENOTFOUND)
+				ret = db_map_put(brain, type, key, value);
 			if (ret) goto fail;
 		}
 	}
-
-	ret = db_map_free(&hand);
 
 fail:
 	fclose(fd);

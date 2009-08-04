@@ -3,32 +3,32 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "types.h"
 #include "dict.h"
 #include "err.h"
-#include "types.h"
 #include "db.h"
 #include "model.h"
 #include "output.h"
 
-int do_list(const char *name, const char *prefix, const char *type) {
+int do_list(const char *name, const char *prefix, const char *suffix, enum list type) {
 	char *filename;
 	int ret;
 
-	filename = malloc((strlen(prefix) + 5) * sizeof(char));
+	filename = malloc((strlen(prefix) + 1 + strlen(suffix) + 1) * sizeof(char));
 	if (filename == NULL) return -ENOMEM;
-	if (sprintf(filename, "%s.%s", prefix, type) <= 0) return -EFAULT;
+	if (sprintf(filename, "%s.%s", prefix, suffix) <= 0) return -EFAULT;
 
 	ret = load_list(name, type, filename);
 	return ret;
 }
 
-int do_map(const char *name, const char *prefix, const char *type) {
+int do_map(const char *name, const char *prefix, const char *suffix, enum map type) {
 	char *filename;
 	int ret;
 
-	filename = malloc((strlen(prefix) + 5) * sizeof(char));
+	filename = malloc((strlen(prefix) + 1 + strlen(suffix) + 1) * sizeof(char));
 	if (filename == NULL) return -ENOMEM;
-	if (sprintf(filename, "%s.%s", prefix, type) <= 0) return -EFAULT;
+	if (sprintf(filename, "%s.%s", prefix, suffix) <= 0) return -EFAULT;
 
 	ret = load_map(name, type, filename);
 	return ret;
@@ -38,7 +38,7 @@ int do_brain(const char *name, const char *prefix) {
 	char *filename;
 	int ret;
 
-	filename = malloc((strlen(prefix) + 5) * sizeof(char));
+	filename = malloc((strlen(prefix) + 1 + 3 + 1) * sizeof(char));
 	if (filename == NULL) return -ENOMEM;
 	if (sprintf(filename, "%s.brn", prefix) <= 0) return -EFAULT;
 
@@ -77,22 +77,22 @@ int main(int argc, char *argv[]) {
 
 	if (!strcmp(action, "load")) {
 		state = "do_list aux";
-		ret = do_list(name, prefix, "aux");
+		ret = do_list(name, prefix, "aux", LIST_AUX);
 		if (ret) { log_warn("brain", ret, state); fail = 1; }
 		else log_info("brain", ret, state);
 
 		state = "do_list ban";
-		ret = do_list(name, prefix, "ban");
+		ret = do_list(name, prefix, "ban", LIST_BAN);
 		if (ret) { log_warn("brain", ret, state); fail = 1; }
 		else log_info("brain", ret, state);
 
 		state = "do_list grt";
-		ret = do_list(name, prefix, "grt");
+		ret = do_list(name, prefix, "grt", LIST_GREET);
 		if (ret) { log_warn("brain", ret, state); fail = 1; }
 		else log_info("brain", ret, state);
 
 		state = "do_map swp";
-		ret = do_map(name, prefix, "swp");
+		ret = do_map(name, prefix, "swp", MAP_SWAP);
 		if (ret) { log_warn("brain", ret, state); fail = 1; }
 		else log_info("brain", ret, state);
 

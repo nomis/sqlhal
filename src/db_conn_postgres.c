@@ -29,6 +29,8 @@ int db_connect(void) {
 			PGresult *res = NULL;
 			const char *brains[] = { "brains" };
 			const char *words[] = { "words" };
+			const char *lists[] = { "lists" };
+			const char *maps[] = { "maps" };
 			const char *models[] = { "models" };
 			const char *nodes[] = { "nodes" };
 			int nodes_created = 0;
@@ -37,10 +39,13 @@ int db_connect(void) {
 			if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
 			PQclear(res);
 
+			/* BRAIN */
+
 			res = PQexecPrepared(conn, "table_exists", 1, brains, NULL, NULL, 1);
 			if (PQresultStatus(res) != PGRES_TUPLES_OK) goto fail;
 			if (PQntuples(res) != 1) {
 				PQclear(res);
+
 				res = PQexec(conn, "CREATE TABLE brains (id BIGSERIAL UNIQUE, name TEXT,"\
 					" PRIMARY KEY (name),"\
 					" CONSTRAINT valid_id CHECK (id > 0))");
@@ -48,16 +53,66 @@ int db_connect(void) {
 			}
 			PQclear(res);
 
+			/* WORD */
+
 			res = PQexecPrepared(conn, "table_exists", 1, words, NULL, NULL, 1);
 			if (PQresultStatus(res) != PGRES_TUPLES_OK) goto fail;
 			if (PQntuples(res) != 1) {
 				PQclear(res);
+
 				res = PQexec(conn, "CREATE TABLE words (id SERIAL UNIQUE, word TEXT, added TIMESTAMP NOT NULL DEFAULT NOW(),"\
 					" PRIMARY KEY (word),"\
 					" CONSTRAINT valid_id CHECK (id > 0))");
 				if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
 			}
 			PQclear(res);
+
+			/* LIST */
+
+			res = PQexecPrepared(conn, "table_exists", 1, lists, NULL, NULL, 1);
+			if (PQresultStatus(res) != PGRES_TUPLES_OK) goto fail;
+			if (PQntuples(res) != 1) {
+				PQclear(res);
+
+				res = PQexec(conn, "CREATE TABLE lists (type INT NOT NULL, brain BIGINT NOT NULL, word BIGINT NOT NULL,"\
+					" PRIMARY KEY (brain, type, word),"\
+					" FOREIGN KEY (brain) REFERENCES brains (id) ON UPDATE CASCADE ON DELETE CASCADE,"\
+					" FOREIGN KEY (word) REFERENCES words (id) ON UPDATE CASCADE ON DELETE CASCADE,"\
+					" CONSTRAINT valid_type CHECK (type >= 1 AND type <= 3))");
+				if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
+				PQclear(res);
+
+				res = PQexec(conn, "CREATE INDEX lists_words ON lists (word)");
+				if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
+			}
+			PQclear(res);
+
+			/* MAP */
+
+			res = PQexecPrepared(conn, "table_exists", 1, maps, NULL, NULL, 1);
+			if (PQresultStatus(res) != PGRES_TUPLES_OK) goto fail;
+			if (PQntuples(res) != 1) {
+				PQclear(res);
+
+				res = PQexec(conn, "CREATE TABLE maps (type INT NOT NULL, brain BIGINT NOT NULL, key BIGINT NOT NULL, value BIGINT NOT NULL,"\
+					" PRIMARY KEY (brain, key),"\
+					" FOREIGN KEY (brain) REFERENCES brains (id) ON UPDATE CASCADE ON DELETE CASCADE,"\
+					" FOREIGN KEY (key) REFERENCES words (id) ON UPDATE CASCADE ON DELETE CASCADE,"\
+					" FOREIGN KEY (value) REFERENCES words (id) ON UPDATE CASCADE ON DELETE CASCADE,"\
+					" CONSTRAINT valid_type CHECK (type = 4))");
+				if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
+				PQclear(res);
+
+				res = PQexec(conn, "CREATE INDEX maps_keys ON maps (key)");
+				if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
+				PQclear(res);
+
+				res = PQexec(conn, "CREATE INDEX maps_values ON maps (value)");
+				if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
+			}
+			PQclear(res);
+
+			/* MODEL */
 
 			res = PQexecPrepared(conn, "table_exists", 1, nodes, NULL, NULL, 1);
 			if (PQresultStatus(res) != PGRES_TUPLES_OK) goto fail;
@@ -74,15 +129,13 @@ int db_connect(void) {
 				if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
 				PQclear(res);
 
-				res = PQexec(conn, "CREATE INDEX nodes_brain ON nodes (brain)");
+				res = PQexec(conn, "CREATE INDEX nodes_words ON nodes (word)");
 				if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
 				PQclear(res);
 
-				res = PQexec(conn, "CREATE INDEX nodes_words ON nodes (word)");
-				if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
-
 				res = PQexec(conn, "CREATE INDEX nodes_child ON nodes (parent)");
 				if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
+
 				nodes_created = 1;
 			}
 			PQclear(res);
@@ -109,6 +162,8 @@ int db_connect(void) {
 				PQclear(res);
 			}
 
+			/* BRAIN */
+
 			res = PQprepare(conn, "brain_add", "INSERT INTO brains (name) VALUES($1)", 1, NULL);
 			if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
 			PQclear(res);
@@ -121,6 +176,8 @@ int db_connect(void) {
 			if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
 			PQclear(res);
 
+			/* WORD */
+
 			res = PQprepare(conn, "word_add", "INSERT INTO words (word) VALUES($1)", 1, NULL);
 			if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
 			PQclear(res);
@@ -132,6 +189,36 @@ int db_connect(void) {
 			res = PQprepare(conn, "word_get", "SELECT id FROM words WHERE word = $1", 1, NULL);
 			if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
 			PQclear(res);
+
+			/* LIST */
+
+			res = PQprepare(conn, "list_add", "INSERT INTO lists (brain, type, word) VALUES($1, $2, $3)", 3, NULL);
+			if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
+			PQclear(res);
+
+			res = PQprepare(conn, "list_get", "SELECT word FROM lists WHERE brain = $1 AND type = $2 AND word = $3", 3, NULL);
+			if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
+			PQclear(res);
+
+			res = PQprepare(conn, "list_zap", "DELETE FROM lists WHERE brain = $1 AND type = $2", 2, NULL);
+			if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
+			PQclear(res);
+
+			/* MAP */
+
+			res = PQprepare(conn, "map_add", "INSERT INTO maps (brain, type, key, value) VALUES($1, $2, $3, $4)", 4, NULL);
+			if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
+			PQclear(res);
+
+			res = PQprepare(conn, "map_get", "SELECT value FROM maps WHERE brain = $1 AND type = $2 AND key = $3", 3, NULL);
+			if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
+			PQclear(res);
+
+			res = PQprepare(conn, "map_zap", "DELETE FROM maps WHERE brain = $1 AND type = $2", 2, NULL);
+			if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
+			PQclear(res);
+
+			/* MODEL */
 
 			res = PQprepare(conn, "model_add", "INSERT INTO models (brain, contexts) VALUES($1, $2)", 2, NULL);
 			if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
@@ -205,6 +292,8 @@ int db_disconnect(void) {
 	if (conn == NULL)
 		return -EDB;
 
+	/* BRAIN */
+
 	res = PQexec(conn, "DEALLOCATE PREPARE brain_add");
 	PQclear(res);
 
@@ -214,6 +303,8 @@ int db_disconnect(void) {
 	res = PQexec(conn, "DEALLOCATE PREPARE brain_get");
 	PQclear(res);
 
+	/* WORD */
+
 	res = PQexec(conn, "DEALLOCATE PREPARE word_add");
 	PQclear(res);
 
@@ -222,6 +313,30 @@ int db_disconnect(void) {
 
 	res = PQexec(conn, "DEALLOCATE PREPARE word_get");
 	PQclear(res);
+
+	/* LIST */
+
+	res = PQexec(conn, "DEALLOCATE PREPARE list_get");
+	PQclear(res);
+
+	res = PQexec(conn, "DEALLOCATE PREPARE list_add");
+	PQclear(res);
+
+	res = PQexec(conn, "DEALLOCATE PREPARE list_zap");
+	PQclear(res);
+
+	/* MAP */
+
+	res = PQexec(conn, "DEALLOCATE PREPARE map_get");
+	PQclear(res);
+
+	res = PQexec(conn, "DEALLOCATE PREPARE map_add");
+	PQclear(res);
+
+	res = PQexec(conn, "DEALLOCATE PREPARE map_zap");
+	PQclear(res);
+
+	/* MODEL */
 
     res = PQexec(conn, "DEALLOCATE PREPARE model_add");
     PQclear(res);
@@ -310,74 +425,4 @@ int db_rollback(void) {
 fail:
 	PQclear(res);
 	return -EDB;
-}
-
-int db_hand_init(db_hand **hand) {
-	struct db_hand_postgres *hand_p;
-	int ret = OK;
-
-	if (hand == NULL || *hand != NULL) return -EINVAL;
-
-    *hand = malloc(sizeof(struct db_hand_postgres));
-    if (*hand == NULL) return -ENOMEM;
-    hand_p = *hand;
-
-	hand_p->brain = NULL;
-	hand_p->get = NULL;
-	hand_p->add = NULL;
-
-	return ret;
-}
-
-int db_hand_free(db_hand **hand) {
-	struct db_hand_postgres *hand_p;
-	int ret = OK;
-
-	if (hand == NULL || *hand == NULL) return -EINVAL;
-	hand_p = *hand;
-
-	{
-		PGresult *res;
-		char *sql;
-
-		ret = db_connect();
-
-#define SQL "DEALLOCATE PREPARE %s"
-		if (hand_p->add != NULL) {
-			if (!ret) {
-				sql = malloc((strlen(SQL) + strlen(hand_p->add)) * sizeof(char));
-				if (sql == NULL) ret = -ENOMEM;
-				else if (sprintf(sql, SQL, hand_p->add) <= 0) { ret = -EFAULT; free(sql); }
-			}
-
-			if (!ret) {
-				res = PQexec(conn, sql);
-				free(sql);
-				PQclear(res);
-			}
-		}
-
-		if (hand_p->get != NULL) {
-			if (!ret) {
-				sql = malloc((strlen(SQL) + strlen(hand_p->get)) * sizeof(char));
-				if (sql == NULL) ret = -ENOMEM;
-				else if (sprintf(sql, SQL, hand_p->get) <= 0) { ret = -EFAULT; free(sql); }
-			}
-
-			if (!ret) {
-				res = PQexec(conn, sql);
-				free(sql);
-				PQclear(res);
-			}
-		}
-#undef SQL
-	}
-
-	free(hand_p->brain);
-	free(hand_p->add);
-	free(hand_p->get);
-	free(*hand);
-	*hand = NULL;
-
-	return ret;
 }
