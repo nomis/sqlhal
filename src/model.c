@@ -20,13 +20,13 @@ enum load_mode {
 	LOAD_STORE
 };
 
-int load_tree(FILE *fd, enum load_mode mode, uint32_t dict_size, word_t *dict_words, brain_t brain, db_tree *tree) {
+int load_tree(FILE *fd, enum load_mode mode, uint_fast32_t dict_size, word_t *dict_words, brain_t brain, db_tree *tree) {
 	uint16_t symbol;
 	uint32_t usage;
 	uint16_t count;
 	uint16_t branch;
 	int ret;
-	uint16_t i;
+	uint_fast16_t i;
 
 	if (!fread(&symbol, sizeof(symbol), 1, fd)) return -EIO;
 	if (!fread(&usage, sizeof(usage), 1, fd)) return -EIO;
@@ -78,13 +78,13 @@ int load_tree(FILE *fd, enum load_mode mode, uint32_t dict_size, word_t *dict_wo
 	return -EFAULT;
 }
 
-int load_dict(FILE *fd, uint32_t *dict_size, word_t **dict_words) {
+int load_dict(FILE *fd, uint_fast32_t *dict_size, word_t **dict_words) {
 	uint32_t size;
 	uint8_t length;
 	int ret;
 	word_t word;
 	char tmp[256];
-	uint32_t i;
+	uint_fast32_t i;
 
 	if (!fread(&size, sizeof(size), 1, fd)) return -EIO;
 
@@ -92,7 +92,7 @@ int load_dict(FILE *fd, uint32_t *dict_size, word_t **dict_words) {
 	*dict_words = malloc(sizeof(word_t) * size);
 	if (*dict_words == NULL) return -ENOMEM;
 
-	for (i = 0; i < size; i++) {
+	for (i = 0; i < *dict_size; i++) {
 		if (!fread(&length, sizeof(length), 1, fd)) return -EIO;
 
 		tmp[length] = 0;
@@ -126,7 +126,7 @@ int load_dict(FILE *fd, uint32_t *dict_size, word_t **dict_words) {
 	return OK;
 }
 
-void free_dict(uint32_t *dict_size, word_t **dict_words) {
+void free_loaded_dict(uint_fast32_t *dict_size, word_t **dict_words) {
 	free(*dict_words);
 
 	*dict_size = 0;
@@ -140,7 +140,7 @@ int load_brain(char *name, const char *filename) {
 	char cookie[16];
 	number_t order;
 	uint8_t tmp8;
-	uint32_t dict_size;
+	uint_fast32_t dict_size;
 	word_t *dict_words;
 	db_tree *forward;
 	db_tree *backward;
@@ -209,7 +209,7 @@ int load_brain(char *name, const char *filename) {
 
 	log_info("load_brain", 0, "Backward tree loaded");
 
-	free_dict(&dict_size, &dict_words);
+	free_loaded_dict(&dict_size, &dict_words);
 
 fail:
 	fclose(fd);
