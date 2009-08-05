@@ -271,15 +271,17 @@ int db_connect(void) {
 			if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
 			PQclear(res);
 
-			res = PQprepare(conn, "model_node_get", "SELECT word, usage, count FROM nodes WHERE brain = $1 AND id = $2", 2, NULL);
-			if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
-			PQclear(res);
-
 			res = PQprepare(conn, "model_root_set", "UPDATE models SET forward = $2, backward = $3 WHERE brain = $1", 3, NULL);
 			if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
 			PQclear(res);
 
-			res = PQprepare(conn, "model_brain_words", "SELECT id, ROW_NUMBER() OVER (ORDER BY word) - 1, ROW_NUMBER() OVER (ORDER BY id) - 1, word "\
+			res = PQprepare(conn, "model_node_get", "SELECT id, word, usage, count FROM nodes"\
+				" WHERE brain = $1 AND (id = $2 OR parent = $2)"\
+				" ORDER BY (SELECT words.word FROM words WHERE words.id = nodes.word) NULLS LAST", 2, NULL);
+			if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
+			PQclear(res);
+
+			res = PQprepare(conn, "model_brain_words", "SELECT id, ROW_NUMBER() OVER (ORDER BY id) - 1, word "\
 				" FROM words WHERE id IN (SELECT word FROM nodes WHERE brain=$1) ORDER BY word", 1, NULL);
 			if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
 			PQclear(res);
@@ -384,10 +386,13 @@ int db_disconnect(void) {
     res = PQexec(conn, "DEALLOCATE PREPARE model_root_get");
     PQclear(res);
 
+    res = PQexec(conn, "DEALLOCATE PREPARE model_root_set");
+    PQclear(res);
+
     res = PQexec(conn, "DEALLOCATE PREPARE model_node_get");
     PQclear(res);
 
-    res = PQexec(conn, "DEALLOCATE PREPARE model_root_set");
+    res = PQexec(conn, "DEALLOCATE PREPARE model_brain_words");
     PQclear(res);
 
 	PQfinish(conn);

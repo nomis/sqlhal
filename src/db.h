@@ -30,7 +30,8 @@ typedef struct {
 	number_t usage;
 	number_t count;
 
-	struct db_tree **nodes;
+	number_t children;
+	void **nodes;
 } db_tree;
 
 int db_model_zap(brain_t brain);                                             /* clears table */
@@ -42,6 +43,7 @@ db_tree *db_model_node_alloc(void);                                          /* 
 int db_model_create(brain_t brain, db_tree **node);                          /* create node */
 int db_model_update(brain_t brain, db_tree *node);                           /* update node */
 int db_model_link(db_tree *parent, db_tree *child);                          /* add node to tree */
+int db_model_node_fill(brain_t brain, db_tree *node);                        /* load children */
 void db_model_node_free(db_tree **node);                                     /* free node data (recursively) */
 
 int db_model_dump_words(brain_t brain, uint_fast32_t *dict_size, word_t **dict_words, char ***dict_text);

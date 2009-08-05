@@ -177,6 +177,7 @@ int save_dict(FILE *fd, uint_fast32_t dict_size, char **dict_text) {
 	uint32_t _dict_size;
 	uint_fast32_t i;
 
+	_dict_size = dict_size;
 	if (!fwrite(&_dict_size, sizeof(_dict_size), 1, fd)) return -EIO;
 
 	for (i = 0; i < dict_size; i++) {
@@ -184,6 +185,91 @@ int save_dict(FILE *fd, uint_fast32_t dict_size, char **dict_text) {
 		if (!fwrite(&length, sizeof(length), 1, fd)) return -EIO;
 		if (fwrite(dict_text[i], sizeof(char), length, fd) != length) return -EIO;
 	}
+
+	return OK;
+}
+
+int find_word(uint_fast32_t dict_size, word_t *dict_words, word_t word, uint16_t *symbol) {
+	uint_fast32_t min = 0;
+	uint_fast32_t pos;
+	uint_fast32_t max = dict_size - 1;
+
+	if (word == 0)
+		return -EINVAL;
+
+	while (1) {
+		pos = (min + max) / 2;
+
+		if (word == dict_words[pos]) {
+			*symbol = pos;
+			return OK;
+		} else if (word > dict_words[pos]) {
+			if (max == pos) {
+				log_error("find_word", word, "Word missing from dictionary");
+				return -ENOTFOUND;
+			}
+			min = pos + 1;
+		} else {
+			if (min == pos) {
+				log_error("find_word", word, "Word missing from dictionary");
+				return -ENOTFOUND;
+			}
+			max = pos - 1;
+		}
+	}
+}
+
+int save_tree(FILE *fd, uint_fast32_t dict_size, word_t *dict_words, brain_t brain, db_tree **tree) {
+	db_tree *tree_p;
+	uint16_t symbol;
+	uint32_t usage;
+	uint16_t count;
+	uint16_t branch;
+	int ret;
+	uint_fast16_t i;
+
+	if (fd == NULL || dict_words == NULL || brain == 0 || tree == NULL || *tree == NULL)
+		return -EINVAL;
+
+	if (dict_size > UINT16_MAX)
+		return -ENOSPC;
+
+	tree_p = *tree;
+
+	if (tree_p->word == 0) {
+		if (tree_p->parent_id == 0) {
+			symbol = TOKEN_ERROR_IDX;
+		} else {
+			if (tree_p->usage != 0 || tree_p->children != 0)
+				return -EFAULT;
+
+			symbol = TOKEN_FIN_IDX;
+		}
+	} else {
+		ret = find_word(dict_size, dict_words, tree_p->word, &symbol);
+		if (ret) return ret;
+	}
+
+	usage = tree_p->usage > UINT32_MAX ? UINT32_MAX : tree_p->usage;
+	count = tree_p->count > UINT16_MAX ? UINT16_MAX : tree_p->count;
+
+	if (tree_p->children > UINT16_MAX)
+		return -EFAULT;
+	branch = tree_p->children;
+
+	if (!fwrite(&symbol, sizeof(symbol), 1, fd)) return -EIO;
+	if (!fwrite(&usage, sizeof(usage), 1, fd)) return -EIO;
+	if (!fwrite(&count, sizeof(count), 1, fd)) return -EIO;
+	if (!fwrite(&branch, sizeof(branch), 1, fd)) return -EIO;
+
+	for (i = 0; i < tree_p->children; i++) {
+		ret = db_model_node_fill(brain, (db_tree *)tree_p->nodes[i]);
+		if (ret) return ret;
+
+		ret = save_tree(fd, dict_size, dict_words, brain, (db_tree **)&tree_p->nodes[i]);
+		if (ret) return ret;
+	}
+	db_model_node_free(tree);
 
 	return OK;
 }
@@ -276,6 +362,7 @@ int save_brain(char *name, const char *filename) {
 	int ret = OK;
 	brain_t brain;
 	number_t order;
+	uint8_t tmp8;
 	uint_fast32_t dict_size;
 	word_t *dict_words;
 	char **dict_text;
@@ -295,6 +382,9 @@ int save_brain(char *name, const char *filename) {
 	ret = db_model_get_order(brain, &order);
 	if (ret) goto fail;
 
+	if (order > UINT8_MAX) return -ENOSPC;
+	tmp8 = order;
+
 	ret = db_model_get_root(brain, &forward, &backward);
 	if (ret) goto fail;
 
@@ -304,18 +394,18 @@ int save_brain(char *name, const char *filename) {
 	log_info("save_brain", dict_size, "Dictionary read");
 
 	if (fwrite(COOKIE, sizeof(char), strlen(COOKIE), fd) != strlen(COOKIE)) return -EIO;
-	if (!fwrite(&order, sizeof(order), 1, fd)) return -EIO;
-#if 0
-	ret = save_tree(fd, dict_size, dict_words, brain, forward); /* forward */
+	if (!fwrite(&tmp8, sizeof(tmp8), 1, fd)) return -EIO;
+
+	ret = save_tree(fd, dict_size, dict_words, brain, &forward); /* forward */
 	if (ret) goto fail;
 
 	log_info("save_brain", 0, "Forward tree saved");
 
-	ret = save_tree(fd, dict_size, dict_words, brain, backward); /* backward */
+	ret = save_tree(fd, dict_size, dict_words, brain, &backward); /* backward */
 	if (ret) goto fail;
 
 	log_info("save_brain", 0, "Backward tree saved");
-#endif
+
 	ret = save_dict(fd, dict_size, dict_text);
 	if (ret) goto fail;
 

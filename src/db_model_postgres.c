@@ -112,15 +112,35 @@ db_tree *db_model_node_alloc(void) {
 	node->word = 0;
 	node->usage = 0;
 	node->count = 0;
+
+	node->children = 0;
 	node->nodes = NULL;
 
 	return node;
 }
 
+void db_model_node_free(db_tree **node) {
+	db_tree *node_p;
+	number_t i;
+
+	if (node == NULL || *node == NULL) return;
+
+	node_p = *node;
+
+	for (i = 0; i < node_p->children; i++)
+		db_model_node_free((db_tree **)&node_p->nodes[i++]);
+	free(node_p->nodes);
+
+	free(*node);
+	*node = NULL;
+}
+
 int db_model_node_fill(brain_t brain, db_tree *node) {
 	PGresult *res;
+	unsigned int num, pos, i;
 	const char *param[2];
 	char tmp[2][32];
+	int parent;
 
 	if (brain == 0 || node == NULL) return -EINVAL;
 	if (db_connect())
@@ -131,13 +151,71 @@ int db_model_node_fill(brain_t brain, db_tree *node) {
 
 	res = PQexecPrepared(conn, "model_node_get", 2, param, NULL, NULL, 0);
 	if (PQresultStatus(res) != PGRES_TUPLES_OK) goto fail;
-	if (PQntuples(res) == 0) goto not_found;
 
-	GET_VALUE(res, 0, 0, node->word);
-	GET_VALUE(res, 0, 1, node->usage);
-	GET_VALUE(res, 0, 2, node->count);
+	num = PQntuples(res);
+	if (num == 0) goto not_found;
+
+	if (node->nodes != NULL) {
+		for (i = 0; i < node->children; i++)
+			db_model_node_free((db_tree **)&node->nodes[i++]);
+		free(node->nodes);
+		node->children = 0;
+	}
+
+	node->children = num - 1;
+
+	if (node->children > 0) {
+		node->nodes = malloc(sizeof(db_tree *) * node->children);
+		if (node->nodes == NULL) {
+			PQclear(res);
+
+			node->children = 0;
+
+			return -ENOMEM;
+		}
+	}
+
+	parent = -EFAULT;
+	for (i = 0, pos = 0; i < num; i++) {
+		db_tree *child;
+		node_t id;
+
+		GET_VALUE(res, i, 0, id);
+
+		if (id == node->id) {
+			parent = OK;
+
+			GET_VALUE(res, i, 1, node->word);
+			GET_VALUE(res, i, 2, node->usage);
+			GET_VALUE(res, i, 3, node->count);
+		} else {
+			node->nodes[pos] = db_model_node_alloc();
+			if (node->nodes[pos] == NULL) {
+				PQclear(res);
+
+				while (pos > 0)
+					db_model_node_free((db_tree **)&node->nodes[--pos]);
+				free(node->nodes);
+				node->nodes = NULL;
+
+				return -ENOMEM;
+			}
+
+			child = (db_tree *)node->nodes[pos];
+
+			child->id = id;
+			GET_VALUE(res, i, 1, child->word);
+			GET_VALUE(res, i, 2, child->usage);
+			GET_VALUE(res, i, 3, child->count);
+
+			pos++;
+		}
+	}
 
 	PQclear(res);
+
+	if (parent)
+		return parent;
 
 	return OK;
 
@@ -147,6 +225,7 @@ fail:
 	return -EDB;
 
 not_found:
+	log_error("db_model_node_fill", node->id, "Node not found");
 	PQclear(res);
 	return -ENOTFOUND;
 }
@@ -181,10 +260,10 @@ int db_model_get_root(brain_t brain, db_tree **forward, db_tree **backward) {
 		GET_VALUE(res, 0, 0, forward_p->id);
 
 		ret = db_model_node_fill(brain, forward_p);
-		if (ret) goto fail;
+		if (ret) { PQclear(res); return ret; }
 	} else {
 		ret = db_model_create(brain, forward);
-		if (ret) goto fail;
+		if (ret) { PQclear(res); return ret; }
 
 		forward_p = *forward;
 		created = 1;
@@ -198,10 +277,10 @@ int db_model_get_root(brain_t brain, db_tree **forward, db_tree **backward) {
 		GET_VALUE(res, 0, 1, backward_p->id);
 
 		ret = db_model_node_fill(brain, backward_p);
-		if (ret) goto fail;
+		if (ret) { PQclear(res); return ret; }
 	} else {
 		ret = db_model_create(brain, backward);
-		if (ret) goto fail;
+		if (ret) { PQclear(res); return ret; }
 
 		backward_p = *backward;
 		created = 1;
@@ -329,27 +408,9 @@ int db_model_link(db_tree *parent, db_tree *child) {
 	return OK;
 }
 
-void db_model_node_free(db_tree **node) {
-	db_tree *node_p;
-	number_t i = 0;
-
-	if (node == NULL || *node == NULL) return;
-
-	node_p = *node;
-
-	if (node_p->nodes != NULL) {
-		while (node_p->nodes[i] != NULL)
-			db_model_node_free((db_tree **)&node_p->nodes[i++]);
-		free(node_p->nodes);
-	}
-
-	free(*node);
-	*node = NULL;
-}
-
 int db_model_dump_words(brain_t brain, uint_fast32_t *dict_size, word_t **dict_words, char ***dict_text) {
 	PGresult *res;
-	int num, i;
+	unsigned int num, i;
 	uint_fast32_t base;
 	void *mem;
 	const char *param[1];
@@ -369,32 +430,34 @@ int db_model_dump_words(brain_t brain, uint_fast32_t *dict_size, word_t **dict_w
 	num = PQntuples(res);
 
 	mem = realloc(*dict_words, sizeof(word_t) * (base + num));
-	if (mem == NULL) return -ENOMEM;
+	if (mem == NULL) { PQclear(res); return -ENOMEM; }
 	*dict_words = mem;
 
 	mem = realloc(*dict_text, sizeof(char *) * (base + num));
-	if (mem == NULL) return -ENOMEM;
+	if (mem == NULL) { PQclear(res); return -ENOMEM; }
 	*dict_text = mem;
 
 	for (i = 0; i < num; i++) {
 		word_t word;
-		number_t pos_word;
-		number_t pos_id;
+		number_t pos;
 		char *text;
 
 		GET_VALUE(res, i, 0, word);
-		GET_VALUE(res, i, 1, pos_word);
-		GET_VALUE(res, i, 2, pos_id);
-		text = PQgetvalue(res, i, 3);
+		GET_VALUE(res, i, 1, pos);
+		text = PQgetvalue(res, i, 2);
 
-		(*dict_words)[base + pos_id] = base + pos_word;
+		(*dict_words)[base + pos] = word;
 		(*dict_text)[*dict_size] = strdup(text);
-		if ((*dict_text)[*dict_size] == NULL)
+		if ((*dict_text)[*dict_size] == NULL) {
+			PQclear(res);
 			return -ENOMEM;
+		}
 
 		(*dict_size)++;
-		if (*dict_size <= 0 || *dict_size > UINT32_MAX)
+		if (*dict_size <= 0 || *dict_size > UINT32_MAX) {
+			PQclear(res);
 			return -ENOSPC;
+		}
 	}
 
 	PQclear(res);
