@@ -42,7 +42,7 @@ int input_map(const char *name, const char *prefix, const char *suffix, enum map
 	if (filename == NULL) return -ENOMEM;
 	if (sprintf(filename, "%s.%s", prefix, suffix) <= 0) return -EFAULT;
 
-	ret = save_map(name, type, filename);
+	ret = load_map(name, type, filename);
 	return ret;
 }
 
