@@ -28,14 +28,20 @@ int load_tree(FILE *fd, enum load_mode mode, uint_fast32_t dict_size, word_t *di
 	int ret;
 	uint_fast16_t i;
 
+	if (fd == NULL)
+		return -EINVAL;
+
 	if (!fread(&symbol, sizeof(symbol), 1, fd)) return -EIO;
 	if (!fread(&usage, sizeof(usage), 1, fd)) return -EIO;
 	if (!fread(&count, sizeof(count), 1, fd)) return -EIO;
 	if (!fread(&branch, sizeof(branch), 1, fd)) return -EIO;
 
-	if (tree != NULL) {
+	if (mode == LOAD_STORE) {
+		if (dict_words == NULL || brain == 0 || tree == NULL)
+			return -EINVAL;
+
 		if (symbol >= dict_size) {
-			log_error("load_tree", symbol, "Symbol references beyond dictionary");
+			log_error("load_tree", symbol, "Symbol references beyond end of dictionary");
 			return -EINVAL;
 		}
 
@@ -47,35 +53,26 @@ int load_tree(FILE *fd, enum load_mode mode, uint_fast32_t dict_size, word_t *di
 		if (ret) return ret;
 	}
 
-	if (branch == 0) return OK;
+	for (i = 0; i < branch; i++) {
+		db_tree *node = NULL;
 
-	switch (mode) {
-		case LOAD_STORE:
-			if (dict_words == NULL || brain == 0 || tree == NULL)
-				return -EINVAL;
-		case LOAD_IGNORE:
-			for (i = 0; i < branch; i++) {
-				db_tree *node = NULL;
+		if (mode == LOAD_STORE) {
+			node = db_model_node_alloc();
+			if (node == NULL) return -ENOMEM;
 
-				if (mode == LOAD_STORE) {
-					node = db_model_node_alloc();
-					if (node == NULL) return -ENOMEM;
+			ret = db_model_link(tree, node);
+			if (ret) return ret;
+		}
 
-					ret = db_model_link(tree, node);
-					if (ret) return ret;
-				}
+		ret = load_tree(fd, mode, dict_size, dict_words, brain, node);
+		if (ret) return ret;
 
-				ret = load_tree(fd, mode, dict_size, dict_words, brain, node);
-				if (ret) return ret;
-
-				if (mode == LOAD_STORE) {
-					db_model_node_free(&node);
-				}
-			}
-			return OK;
+		if (mode == LOAD_STORE) {
+			db_model_node_free(&node);
+		}
 	}
 
-	return -EFAULT;
+	return OK;
 }
 
 int load_dict(FILE *fd, uint_fast32_t *dict_size, word_t **dict_words) {
