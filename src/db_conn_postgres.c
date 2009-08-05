@@ -34,6 +34,15 @@ int db_connect(void) {
 			const char *models[] = { "models" };
 			const char *nodes[] = { "nodes" };
 			int nodes_created = 0;
+			int server_ver;
+
+			server_ver = PQserverVersion(conn);
+			if (server_ver < 80400) {
+				log_error("DB", server_ver, "Server version must be 8.4.0+");
+				PQfinish(conn);
+				conn = NULL;
+				return -EDB;
+			}
 
 			res = PQprepare(conn, "table_exists", "SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename = $1", 1, NULL);
 			if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
