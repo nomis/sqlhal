@@ -346,3 +346,63 @@ void db_model_node_free(db_tree **node) {
 	free(*node);
 	*node = NULL;
 }
+
+int db_model_dump_words(brain_t brain, uint_fast32_t *dict_size, word_t **dict_words, char ***dict_text) {
+	PGresult *res;
+	int num, i;
+	uint_fast32_t base;
+	void *mem;
+	const char *param[1];
+	char tmp[1][32];
+
+	if (brain == 0 || dict_size == NULL || dict_words == NULL || dict_text == NULL) return -EINVAL;
+	if (*dict_words == NULL || *dict_text == NULL) return -EINVAL;
+	if (db_connect())
+		return -EDB;
+
+	SET_PARAM(param, tmp, 0, brain);
+
+	res = PQexecPrepared(conn, "model_brain_words", 1, param, NULL, NULL, 0);
+	if (PQresultStatus(res) != PGRES_TUPLES_OK) goto fail;
+
+	base = *dict_size;
+	num = PQntuples(res);
+
+	mem = realloc(*dict_words, sizeof(word_t) * (base + num));
+	if (mem == NULL) return -ENOMEM;
+	*dict_words = mem;
+
+	mem = realloc(*dict_text, sizeof(char *) * (base + num));
+	if (mem == NULL) return -ENOMEM;
+	*dict_text = mem;
+
+	for (i = 0; i < num; i++) {
+		word_t word;
+		number_t pos_word;
+		number_t pos_id;
+		char *text;
+
+		GET_VALUE(res, i, 0, word);
+		GET_VALUE(res, i, 1, pos_word);
+		GET_VALUE(res, i, 2, pos_id);
+		text = PQgetvalue(res, i, 3);
+
+		(*dict_words)[base + pos_id] = base + pos_word;
+		(*dict_text)[*dict_size] = strdup(text);
+		if ((*dict_text)[*dict_size] == NULL)
+			return -ENOMEM;
+
+		(*dict_size)++;
+		if (*dict_size <= 0 || *dict_size > UINT32_MAX)
+			return -ENOSPC;
+	}
+
+	PQclear(res);
+
+	return OK;
+
+fail:
+	log_error("db_model_dump_words", PQresultStatus(res), PQresultErrorMessage(res));
+	PQclear(res);
+	return -EDB;
+}

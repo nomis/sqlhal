@@ -5,3 +5,4 @@
 #define ENOTFOUND 4
 #define EFAULT 5
 #define ENOMEM 6
+#define ENOSPC 7

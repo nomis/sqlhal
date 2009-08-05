@@ -133,16 +133,29 @@ void free_loaded_dict(uint_fast32_t *dict_size, word_t **dict_words) {
 	*dict_words = NULL;
 }
 
-int read_dict(brain_t brain, uint_fast32_t *dict_size, word_t **dict_words, char ***dict_text) {
+void free_saved_dict(uint_fast32_t *dict_size, word_t **dict_words, char ***dict_text) {
 	uint_fast32_t i;
-	(void)brain;
 
-	i = TOKENS;
+	for (i = TOKENS; i < *dict_size; i++)
+		free((*dict_text)[i]);
 
-	*dict_words = malloc(sizeof(word_t) * i);
+	free(*dict_words);
+	free(*dict_text);
+
+	*dict_size = 0;
+	*dict_words = NULL;
+	*dict_text = NULL;
+}
+
+int read_dict(brain_t brain, uint_fast32_t *dict_size, word_t **dict_words, char ***dict_text) {
+	int ret;
+
+	*dict_size = 0;
+
+	*dict_words = malloc(sizeof(word_t) * TOKENS);
 	if (*dict_words == NULL) return -ENOMEM;
 
-	*dict_text = malloc(sizeof(char *) * i);
+	*dict_text = malloc(sizeof(char *) * TOKENS);
 	if (*dict_text == NULL) return -ENOMEM;
 
 	(*dict_words)[TOKEN_ERROR_IDX] = 0;
@@ -151,9 +164,13 @@ int read_dict(brain_t brain, uint_fast32_t *dict_size, word_t **dict_words, char
 	(*dict_words)[TOKEN_FIN_IDX] = 0;
 	(*dict_text)[TOKEN_FIN_IDX] = TOKEN_FIN;
 
+	*dict_size = TOKENS;
 
-
-	*dict_size = i;
+	ret = db_model_dump_words(brain, dict_size, dict_words, dict_text);
+	if (ret) {
+		free_saved_dict(dict_size, dict_words, dict_text);
+		return ret;
+	}
 
 	return OK;
 }
@@ -172,20 +189,6 @@ int save_dict(FILE *fd, uint_fast32_t dict_size, char **dict_text) {
 	}
 
 	return OK;
-}
-
-void free_saved_dict(uint_fast32_t *dict_size, word_t **dict_words, char ***dict_text) {
-	uint_fast32_t i;
-
-	for (i = TOKENS; i < *dict_size; i++)
-		free((*dict_text)[i]);
-
-	free(*dict_words);
-	free(*dict_text);
-
-	*dict_size = 0;
-	*dict_words = NULL;
-	*dict_text = NULL;
 }
 
 int load_brain(char *name, const char *filename) {
