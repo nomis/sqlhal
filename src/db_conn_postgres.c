@@ -144,7 +144,7 @@ int db_connect(void) {
 				if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
 				PQclear(res);
 
-				res = PQexec(conn, "CREATE INDEX nodes_child ON nodes (parent)");
+				res = PQexec(conn, "CREATE UNIQUE INDEX nodes_child ON nodes (parent, word)");
 				if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
 
 				nodes_created = 1;
