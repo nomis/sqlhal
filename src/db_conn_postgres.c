@@ -44,6 +44,8 @@ int db_connect(void) {
 				return -EDB;
 			}
 
+			if (db_begin()) goto fail2;
+
 			res = PQprepare(conn, "table_exists", "SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename = $1", 1, NULL);
 			if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
 			PQclear(res);
@@ -288,10 +290,13 @@ int db_connect(void) {
 
 			res = NULL;
 
+			if(db_commit()) goto fail2;
+
 fail:
 			if (res != NULL) {
 				log_error("db_connect", PQresultStatus(res), PQresultErrorMessage(res));
 				PQclear(res);
+fail2:
 				PQfinish(conn);
 				conn = NULL;
 			}
