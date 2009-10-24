@@ -53,6 +53,8 @@ int iter_list_item(void *data, word_t ref, const char *word) {
 	int ret;
 	(void)ref;
 
+	if (word == NULL || word[0] == 0) return -EFAULT;
+
 	ret = fprintf(fd, "%s\n", word);
 	if (ret <= 0) return -EIO;
 
@@ -160,6 +162,9 @@ int iter_map_item(void *data, word_t key_ref, word_t value_ref, const char *key,
 	int ret;
 	(void)key_ref;
 	(void)value_ref;
+
+	if (key == NULL || key[0] == 0) return -EFAULT;
+	if (value == NULL || value[0] == 0) return -EFAULT;
 
 	ret = fprintf(fd, "%s\t%s\n", key, value);
 	if (ret <= 0) return -EIO;
