@@ -2,20 +2,29 @@ DB=postgres
 CFLAGS=-Wall -Wextra -Wshadow -Werror -g -O0
 
 STD_H=err.h types.h
-BIN=brain
+BIN=brain train
 
 all: $(BIN)
 clean:
 	rm -f *.o $(BIN)
 
-BRAIN=brain.o dict.o model.o console.o db.o db_conn_$(DB).o db_brain_$(DB).o db_word_$(DB).o db_list_$(DB).o db_map_$(DB).o db_model_$(DB).o
+DB_OBJS=db.o db_conn_$(DB).o db_brain_$(DB).o db_word_$(DB).o db_list_$(DB).o db_map_$(DB).o db_model_$(DB).o
+
+BRAIN=brain.o dict.o model.o console.o $(DB_OBJS)
 brain: $(BRAIN)
 	$(CC) -o $@ $(BRAIN) -lpq
 
-db.h: types.h
+TRAIN=train.o megahal.o console.o $(DB_OBJS)
+train: $(TRAIN)
+	$(CC) -o $@ $(TRAIN) -lpq
 
-brain.o: dict.h output.h
-cli.o: output.h
+db.h: types.h err.h
+
+brain.o: dict.h model.h output.h db.h
+train.o: megahal.h output.h db.h
+megahal.o: dict.h model.h db.h
+
+console.o: output.h
 dict.o: db.h $(STD_H)
 db.o: db.h $(STD_H)
 db_conn_postgres.o: db.h db_postgres.h $(STD_H)
