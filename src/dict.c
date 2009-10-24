@@ -28,7 +28,7 @@ int load_list(const char *name, enum list type, const char *filename) {
 	while (!feof(fd)) {
 		if (fgets(buffer, 1024, fd) == NULL) break;
 		if (buffer[0] == '#') continue;
-		string = strtok(buffer, "\t \n#");
+		string = strtok(buffer, "\t \r\n#");
 
 		if ((string != NULL) && (strlen(string) > 0)) {
 			word_t word;
@@ -134,7 +134,7 @@ int load_map(const char *name, enum map type, const char *filename) {
 		if (buffer[0] == '#') continue;
 
 		from = strtok(buffer, "\t ");
-		to = strtok(NULL, "\t \n#");
+		to = strtok(NULL, "\t \r\n#");
 
 		if ((from != NULL) && (strlen(from) > 0) && (to != NULL) && (strlen(to) > 0)) {
 			word_t key, value;
