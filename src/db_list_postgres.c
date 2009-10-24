@@ -70,7 +70,7 @@ not_found:
 
 int db_list_zap(brain_t brain, enum list type) {
 	PGresult *res;
-	const char *param[1];
+	const char *param[2];
 	char tmp[2][32];
 
 	if (brain == 0) return -EINVAL;
