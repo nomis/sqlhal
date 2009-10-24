@@ -93,6 +93,7 @@ int db_list_iter(brain_t brain, enum list type, int (*callback)(void *data, word
 
 		GET_VALUE(res, i, 0, ref);
 		word = PQgetvalue(res, i, 1);
+		if (word == NULL) goto fail;
 
 		ret = callback(data, ref, word);
 		if (ret) goto fail;

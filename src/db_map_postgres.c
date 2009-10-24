@@ -97,7 +97,9 @@ int db_map_iter(brain_t brain, enum list type, int (*callback)(void *data, word_
 		GET_VALUE(res, i, 0, key_ref);
 		GET_VALUE(res, i, 1, value_ref);
 		key = PQgetvalue(res, i, 2);
+		if (key == NULL) goto fail;
 		value = PQgetvalue(res, i, 3);
+		if (value == NULL) goto fail;
 
 		ret = callback(data, key_ref, value_ref, key, value);
 		if (ret) goto fail;

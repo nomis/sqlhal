@@ -449,6 +449,7 @@ int db_model_dump_words(brain_t brain, uint_fast32_t *dict_size, word_t **dict_w
 		GET_VALUE(res, i, 0, word);
 		GET_VALUE(res, i, 1, pos);
 		text = PQgetvalue(res, i, 2);
+		if (text == NULL) goto fail;
 
 		(*dict_words)[base + pos] = word;
 		(*dict_idx)[base + pos] = *dict_size;
