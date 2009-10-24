@@ -2,7 +2,7 @@ DB=postgres
 CFLAGS=-Wall -Wextra -Wshadow -Werror -g -O0
 
 STD_H=err.h types.h
-BIN=brain train
+BIN=brain train learn getreply hal
 
 all: $(BIN)
 clean:
@@ -18,10 +18,25 @@ TRAIN=train.o megahal.o console.o $(DB_OBJS)
 train: $(TRAIN)
 	$(CC) -o $@ $(TRAIN) -lpq
 
+LEARN=learn.o megahal.o console.o $(DB_OBJS)
+learn: $(LEARN)
+	$(CC) -o $@ $(LEARN) -lpq
+
+GETREPLY=getreply.o megahal.o console.o $(DB_OBJS)
+getreply: $(GETREPLY)
+	$(CC) -o $@ $(GETREPLY) -lpq
+
+HAL=hal.o megahal.o console.o $(DB_OBJS)
+hal: $(HAL)
+	$(CC) -o $@ $(HAL) -lpq
+
 db.h: types.h err.h
 
 brain.o: dict.h model.h output.h db.h
 train.o: megahal.h output.h db.h
+learn.o: megahal.h output.h db.h
+getreply.o: megahal.h output.h db.h
+hal.o: megahal.h output.h db.h
 megahal.o: dict.h model.h db.h
 
 console.o: output.h
