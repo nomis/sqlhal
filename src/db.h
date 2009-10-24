@@ -17,11 +17,13 @@ int db_list_zap(brain_t brain, enum list type);                              /* 
 int db_list_add(brain_t brain, enum list type, word_t word);                 /* add word (does not exist) */
 int db_list_contains(brain_t brain, enum list type, word_t word);            /* return -ENOTFOUND if word does not exist */
 int db_list_del(brain_t brain, enum list type, word_t word);                 /* delete word (exists) */
+int db_list_iter(brain_t brain, enum list type, int (*callback)(void *data, word_t ref, const char *word), void *data); /* iterate through list */
 
 int db_map_zap(brain_t brain, enum map type);                                /* clears table */
 int db_map_get(brain_t brain, enum map type, word_t key, word_t *value);     /* return -ENOTFOUND if key does not exist */
 int db_map_put(brain_t brain, enum map type, word_t key, word_t value);      /* add key (does not exist) */
 int db_map_del(brain_t brain, enum map type, word_t key);                    /* delete key (exists) */
+int db_map_iter(brain_t brain, enum list type, int (*callback)(void *data, word_t key_ref, word_t key_value, const char *key, const char *value), void *data); /* iterate through map */
 
 typedef struct {
 	node_t id;

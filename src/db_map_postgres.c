@@ -71,6 +71,48 @@ not_found:
 	return -ENOTFOUND;
 }
 
+int db_map_iter(brain_t brain, enum list type, int (*callback)(void *data, word_t word_ref, word_t value_ref, const char *key, const char *value), void *data) {
+	PGresult *res;
+	unsigned int num, i;
+	const char *param[2];
+	char tmp[2][32];
+
+	if (brain == 0) return -EINVAL;
+	if (db_connect())
+		return -EDB;
+
+	SET_PARAM(param, tmp, 0, brain);
+	SET_PARAM(param, tmp, 1, type);
+
+	res = PQexecPrepared(conn, "map_iter", 2, param, NULL, NULL, 0);
+	if (PQresultStatus(res) != PGRES_TUPLES_OK) goto fail;
+
+	num = PQntuples(res);
+
+	for (i = 0; i < num; i++) {
+		word_t key_ref, value_ref;
+		char *key, *value;
+		int ret;
+
+		GET_VALUE(res, i, 0, key_ref);
+		GET_VALUE(res, i, 1, value_ref);
+		key = PQgetvalue(res, i, 2);
+		value = PQgetvalue(res, i, 3);
+
+		ret = callback(data, key_ref, value_ref, key, value);
+		if (ret) goto fail;
+	}
+
+	PQclear(res);
+
+	return OK;
+
+fail:
+	log_error("db_map_iter", PQresultStatus(res), PQresultErrorMessage(res));
+	PQclear(res);
+	return -EDB;
+}
+
 int db_map_zap(brain_t brain, enum map type) {
 	PGresult *res;
 	const char *param[2];

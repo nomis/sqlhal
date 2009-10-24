@@ -48,6 +48,17 @@ fail:
 	return ret;
 }
 
+int iter_list_item(void *data, word_t ref, const char *word) {
+	FILE *fd = data;
+	int ret;
+	(void)ref;
+
+	ret = fprintf(fd, "%s\n", word);
+	if (ret <= 0) return -EIO;
+
+	return OK;
+}
+
 int save_list(const char *name, enum list type, const char *filename) {
 	FILE *fd;
 	int ret = OK;
@@ -58,11 +69,39 @@ int save_list(const char *name, enum list type, const char *filename) {
 	fd = fopen(filename, "w");
 	if (fd == NULL) return -EIO;
 
+	switch (type) {
+	case LIST_AUX:
+		ret = fprintf(fd, "#\n"\
+			"#\tThis is a list of words which can be used as keywords only\n"\
+			"#\tin order to supplement other keywords\n"\
+			"#\n");
+		break;
+	case LIST_BAN:
+		ret = fprintf(fd, "#\n"\
+			"#\tThis is a list of words which cannot be used as keywords\n"\
+			"#\n");
+		break;
+	case LIST_GREET:
+		ret = fprintf(fd, "#\n"\
+			"#\tThis is a list of words which will be used as keywords whenever\n"\
+			"#\tthe judge changes, in order to greet them.\n"\
+			"#\n");
+		break;
+	default:
+		ret = -EFAULT;
+		goto fail;
+	}
+
+	if (ret <= 0) {
+		ret = -EIO;
+		goto fail;
+	}
+
 	ret = db_brain_get(name, &brain);
 	if (ret) goto fail;
 
-	(void)type;
-	return -EFAULT; // TODO
+	ret = db_list_iter(brain, type, iter_list_item, fd);
+	if (ret) goto fail;
 
 fail:
 	fclose(fd);
@@ -116,6 +155,18 @@ fail:
 	return ret;
 }
 
+int iter_map_item(void *data, word_t key_ref, word_t value_ref, const char *key, const char *value) {
+	FILE *fd = data;
+	int ret;
+	(void)key_ref;
+	(void)value_ref;
+
+	ret = fprintf(fd, "%s\t%s\n", key, value);
+	if (ret <= 0) return -EIO;
+
+	return OK;
+}
+
 int save_map(const char *name, enum map type, const char *filename) {
 	FILE *fd;
 	int ret = OK;
@@ -126,11 +177,29 @@ int save_map(const char *name, enum map type, const char *filename) {
 	fd = fopen(filename, "w");
 	if (fd == NULL) return -EIO;
 
+	switch (type) {
+	case MAP_SWAP:
+		ret = fprintf(fd, "#\n"\
+			"#\tThe word on the left is changed to the word on the\n"\
+			"#\tright when used as a keyword\n"\
+			"#\n");
+		break;
+		break;
+	default:
+		ret = -EFAULT;
+		goto fail;
+	}
+
+	if (ret <= 0) {
+		ret = -EIO;
+		goto fail;
+	}
+
 	ret = db_brain_get(name, &brain);
 	if (ret) goto fail;
 
-	(void)type;
-	return -EFAULT; // TODO
+	ret = db_map_iter(brain, type, iter_map_item, fd);
+	if (ret) goto fail;
 
 fail:
 	fclose(fd);

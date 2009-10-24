@@ -213,6 +213,12 @@ int db_connect(void) {
 			if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
 			PQclear(res);
 
+			res = PQprepare(conn, "list_iter", "SELECT lists.word, words.word FROM lists, words"\
+				" WHERE brain = $1 AND type = $2 AND words.id = lists.word"\
+				" ORDER BY words.word NULLS LAST", 2, NULL);
+			if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
+			PQclear(res);
+
 			res = PQprepare(conn, "list_zap", "DELETE FROM lists WHERE brain = $1 AND type = $2", 2, NULL);
 			if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
 			PQclear(res);
@@ -224,6 +230,13 @@ int db_connect(void) {
 			PQclear(res);
 
 			res = PQprepare(conn, "map_get", "SELECT value FROM maps WHERE brain = $1 AND type = $2 AND key = $3", 3, NULL);
+			if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
+			PQclear(res);
+
+			res = PQprepare(conn, "map_iter", "SELECT maps.key, maps.value, words_k.word, words_v.word"\
+				" FROM maps, words AS words_k, words AS words_v"\
+				" WHERE brain = $1 AND type = $2 AND words_k.id = maps.key AND words_v.id = maps.value"\
+				" ORDER BY words_k.word NULLS LAST", 2, NULL);
 			if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
 			PQclear(res);
 
@@ -345,6 +358,9 @@ int db_disconnect(void) {
 	res = PQexec(conn, "DEALLOCATE PREPARE list_add");
 	PQclear(res);
 
+	res = PQexec(conn, "DEALLOCATE PREPARE list_iter");
+	PQclear(res);
+
 	res = PQexec(conn, "DEALLOCATE PREPARE list_zap");
 	PQclear(res);
 
@@ -354,6 +370,9 @@ int db_disconnect(void) {
 	PQclear(res);
 
 	res = PQexec(conn, "DEALLOCATE PREPARE map_add");
+	PQclear(res);
+
+	res = PQexec(conn, "DEALLOCATE PREPARE map_iter");
 	PQclear(res);
 
 	res = PQexec(conn, "DEALLOCATE PREPARE map_zap");

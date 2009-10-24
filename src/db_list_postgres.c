@@ -68,6 +68,46 @@ not_found:
 	return -ENOTFOUND;
 }
 
+int db_list_iter(brain_t brain, enum list type, int (*callback)(void *data, word_t ref, const char *word), void *data) {
+	PGresult *res;
+	unsigned int num, i;
+	const char *param[2];
+	char tmp[2][32];
+
+	if (brain == 0) return -EINVAL;
+	if (db_connect())
+		return -EDB;
+
+	SET_PARAM(param, tmp, 0, brain);
+	SET_PARAM(param, tmp, 1, type);
+
+	res = PQexecPrepared(conn, "list_iter", 2, param, NULL, NULL, 0);
+	if (PQresultStatus(res) != PGRES_TUPLES_OK) goto fail;
+
+	num = PQntuples(res);
+
+	for (i = 0; i < num; i++) {
+		word_t ref;
+		char *word;
+		int ret;
+
+		GET_VALUE(res, i, 0, ref);
+		word = PQgetvalue(res, i, 1);
+
+		ret = callback(data, ref, word);
+		if (ret) goto fail;
+	}
+
+	PQclear(res);
+
+	return OK;
+
+fail:
+	log_error("db_list_iter", PQresultStatus(res), PQresultErrorMessage(res));
+	PQclear(res);
+	return -EDB;
+}
+
 int db_list_zap(brain_t brain, enum list type) {
 	PGresult *res;
 	const char *param[2];
