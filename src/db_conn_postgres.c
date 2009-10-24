@@ -361,44 +361,44 @@ int db_disconnect(void) {
 
 	/* MODEL */
 
-    res = PQexec(conn, "DEALLOCATE PREPARE model_add");
-    PQclear(res);
+	res = PQexec(conn, "DEALLOCATE PREPARE model_add");
+	PQclear(res);
 
-    res = PQexec(conn, "DEALLOCATE PREPARE model_get");
-    PQclear(res);
+	res = PQexec(conn, "DEALLOCATE PREPARE model_get");
+	PQclear(res);
 
-    res = PQexec(conn, "DEALLOCATE PREPARE model_set");
-    PQclear(res);
+	res = PQexec(conn, "DEALLOCATE PREPARE model_set");
+	PQclear(res);
 
-    res = PQexec(conn, "DEALLOCATE PREPARE model_zap");
-    PQclear(res);
+	res = PQexec(conn, "DEALLOCATE PREPARE model_zap");
+	PQclear(res);
 
-    res = PQexec(conn, "DEALLOCATE PREPARE model_create");
-    PQclear(res);
+	res = PQexec(conn, "DEALLOCATE PREPARE model_create");
+	PQclear(res);
 
-    res = PQexec(conn, "DEALLOCATE PREPARE model_fastcreate");
-    PQclear(res);
+	res = PQexec(conn, "DEALLOCATE PREPARE model_fastcreate");
+	PQclear(res);
 
-    res = PQexec(conn, "DEALLOCATE PREPARE model_create_id");
-    PQclear(res);
+	res = PQexec(conn, "DEALLOCATE PREPARE model_create_id");
+	PQclear(res);
 
-    res = PQexec(conn, "DEALLOCATE PREPARE model_rootupdate");
-    PQclear(res);
+	res = PQexec(conn, "DEALLOCATE PREPARE model_rootupdate");
+	PQclear(res);
 
-    res = PQexec(conn, "DEALLOCATE PREPARE model_update");
-    PQclear(res);
+	res = PQexec(conn, "DEALLOCATE PREPARE model_update");
+	PQclear(res);
 
-    res = PQexec(conn, "DEALLOCATE PREPARE model_root_get");
-    PQclear(res);
+	res = PQexec(conn, "DEALLOCATE PREPARE model_root_get");
+	PQclear(res);
 
-    res = PQexec(conn, "DEALLOCATE PREPARE model_root_set");
-    PQclear(res);
+	res = PQexec(conn, "DEALLOCATE PREPARE model_root_set");
+	PQclear(res);
 
-    res = PQexec(conn, "DEALLOCATE PREPARE model_node_get");
-    PQclear(res);
+	res = PQexec(conn, "DEALLOCATE PREPARE model_node_get");
+	PQclear(res);
 
-    res = PQexec(conn, "DEALLOCATE PREPARE model_brain_words");
-    PQclear(res);
+	res = PQexec(conn, "DEALLOCATE PREPARE model_brain_words");
+	PQclear(res);
 
 	PQfinish(conn);
 	conn = NULL;
