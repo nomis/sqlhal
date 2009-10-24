@@ -408,7 +408,7 @@ int db_model_link(db_tree *parent, db_tree *child) {
 	return OK;
 }
 
-int db_model_dump_words(brain_t brain, uint_fast32_t *dict_size, word_t **dict_words, char ***dict_text) {
+int db_model_dump_words(brain_t brain, uint_fast32_t *dict_size, word_t **dict_words, uint32_t **dict_idx, char ***dict_text) {
 	PGresult *res;
 	unsigned int num, i;
 	uint_fast32_t base;
@@ -416,8 +416,8 @@ int db_model_dump_words(brain_t brain, uint_fast32_t *dict_size, word_t **dict_w
 	const char *param[1];
 	char tmp[1][32];
 
-	if (brain == 0 || dict_size == NULL || dict_words == NULL || dict_text == NULL) return -EINVAL;
-	if (*dict_words == NULL || *dict_text == NULL) return -EINVAL;
+	if (brain == 0 || dict_size == NULL || dict_words == NULL || dict_idx == NULL || dict_text == NULL) return -EINVAL;
+	if (*dict_words == NULL || *dict_idx == NULL || *dict_text == NULL) return -EINVAL;
 	if (db_connect())
 		return -EDB;
 
@@ -433,6 +433,10 @@ int db_model_dump_words(brain_t brain, uint_fast32_t *dict_size, word_t **dict_w
 	if (mem == NULL) { PQclear(res); return -ENOMEM; }
 	*dict_words = mem;
 
+	mem = realloc(*dict_idx, sizeof(uint32_t) * (base + num));
+	if (mem == NULL) { PQclear(res); return -ENOMEM; }
+	*dict_idx = mem;
+
 	mem = realloc(*dict_text, sizeof(char *) * (base + num));
 	if (mem == NULL) { PQclear(res); return -ENOMEM; }
 	*dict_text = mem;
@@ -447,6 +451,7 @@ int db_model_dump_words(brain_t brain, uint_fast32_t *dict_size, word_t **dict_w
 		text = PQgetvalue(res, i, 2);
 
 		(*dict_words)[base + pos] = word;
+		(*dict_idx)[base + pos] = *dict_size;
 		(*dict_text)[*dict_size] = strdup(text);
 		if ((*dict_text)[*dict_size] == NULL) {
 			PQclear(res);

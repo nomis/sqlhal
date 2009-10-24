@@ -130,21 +130,23 @@ void free_loaded_dict(uint_fast32_t *dict_size, word_t **dict_words) {
 	*dict_words = NULL;
 }
 
-void free_saved_dict(uint_fast32_t *dict_size, word_t **dict_words, char ***dict_text) {
+void free_saved_dict(uint_fast32_t *dict_size, word_t **dict_words, uint32_t **dict_idx, char ***dict_text) {
 	uint_fast32_t i;
 
 	for (i = TOKENS; i < *dict_size; i++)
 		free((*dict_text)[i]);
 
 	free(*dict_words);
+	free(*dict_idx);
 	free(*dict_text);
 
 	*dict_size = 0;
 	*dict_words = NULL;
+	*dict_idx = NULL;
 	*dict_text = NULL;
 }
 
-int read_dict(brain_t brain, uint_fast32_t *dict_size, word_t **dict_words, char ***dict_text) {
+int read_dict(brain_t brain, uint_fast32_t *dict_size, word_t **dict_words, uint32_t **dict_idx, char ***dict_text) {
 	int ret;
 
 	*dict_size = 0;
@@ -152,20 +154,25 @@ int read_dict(brain_t brain, uint_fast32_t *dict_size, word_t **dict_words, char
 	*dict_words = malloc(sizeof(word_t) * TOKENS);
 	if (*dict_words == NULL) return -ENOMEM;
 
+	*dict_idx = malloc(sizeof(uint32_t) * TOKENS);
+	if (*dict_idx == NULL) return -ENOMEM;
+
 	*dict_text = malloc(sizeof(char *) * TOKENS);
 	if (*dict_text == NULL) return -ENOMEM;
 
 	(*dict_words)[TOKEN_ERROR_IDX] = 0;
+	(*dict_idx)[TOKEN_ERROR_IDX] = TOKEN_ERROR_IDX;
 	(*dict_text)[TOKEN_ERROR_IDX] = TOKEN_ERROR;
 
 	(*dict_words)[TOKEN_FIN_IDX] = 0;
+	(*dict_idx)[TOKEN_FIN_IDX] = TOKEN_FIN_IDX;
 	(*dict_text)[TOKEN_FIN_IDX] = TOKEN_FIN;
 
 	*dict_size = TOKENS;
 
-	ret = db_model_dump_words(brain, dict_size, dict_words, dict_text);
+	ret = db_model_dump_words(brain, dict_size, dict_words, dict_idx, dict_text);
 	if (ret) {
-		free_saved_dict(dict_size, dict_words, dict_text);
+		free_saved_dict(dict_size, dict_words, dict_idx, dict_text);
 		return ret;
 	}
 
@@ -189,7 +196,7 @@ int save_dict(FILE *fd, uint_fast32_t dict_size, char **dict_text) {
 	return OK;
 }
 
-int find_word(uint_fast32_t dict_size, word_t *dict_words, word_t word, uint16_t *symbol) {
+int find_word(uint_fast32_t dict_size, word_t *dict_words, uint32_t *dict_idx, word_t word, uint16_t *symbol) {
 	uint_fast32_t min = 0;
 	uint_fast32_t pos;
 	uint_fast32_t max = dict_size - 1;
@@ -201,7 +208,9 @@ int find_word(uint_fast32_t dict_size, word_t *dict_words, word_t word, uint16_t
 		pos = (min + max) / 2;
 
 		if (word == dict_words[pos]) {
-			*symbol = pos;
+			if (pos == TOKEN_ERROR_IDX || pos == TOKEN_FIN_IDX)
+				return -EFAULT;
+			*symbol = dict_idx[pos];
 			return OK;
 		} else if (word > dict_words[pos]) {
 			if (max == pos) {
@@ -219,7 +228,7 @@ int find_word(uint_fast32_t dict_size, word_t *dict_words, word_t word, uint16_t
 	}
 }
 
-int save_tree(FILE *fd, uint_fast32_t dict_size, word_t *dict_words, brain_t brain, db_tree **tree) {
+int save_tree(FILE *fd, uint_fast32_t dict_size, word_t *dict_words, uint32_t *dict_idx, brain_t brain, db_tree **tree) {
 	db_tree *tree_p;
 	uint16_t symbol;
 	uint32_t usage;
@@ -246,7 +255,7 @@ int save_tree(FILE *fd, uint_fast32_t dict_size, word_t *dict_words, brain_t bra
 			symbol = TOKEN_FIN_IDX;
 		}
 	} else {
-		ret = find_word(dict_size, dict_words, tree_p->word, &symbol);
+		ret = find_word(dict_size, dict_words, dict_idx, tree_p->word, &symbol);
 		if (ret) return ret;
 	}
 
@@ -266,7 +275,7 @@ int save_tree(FILE *fd, uint_fast32_t dict_size, word_t *dict_words, brain_t bra
 		ret = db_model_node_fill(brain, (db_tree *)tree_p->nodes[i]);
 		if (ret) return ret;
 
-		ret = save_tree(fd, dict_size, dict_words, brain, (db_tree **)&tree_p->nodes[i]);
+		ret = save_tree(fd, dict_size, dict_words, dict_idx, brain, (db_tree **)&tree_p->nodes[i]);
 		if (ret) return ret;
 	}
 	db_model_node_free(tree);
@@ -365,6 +374,7 @@ int save_brain(char *name, const char *filename) {
 	uint8_t tmp8;
 	uint_fast32_t dict_size;
 	word_t *dict_words;
+	uint32_t *dict_idx;
 	char **dict_text;
 	db_tree *forward;
 	db_tree *backward;
@@ -388,7 +398,7 @@ int save_brain(char *name, const char *filename) {
 	ret = db_model_get_root(brain, &forward, &backward);
 	if (ret) goto fail;
 
-	ret = read_dict(brain, &dict_size, &dict_words, &dict_text);
+	ret = read_dict(brain, &dict_size, &dict_words, &dict_idx, &dict_text);
 	if (ret) goto fail;
 
 	log_info("save_brain", dict_size, "Dictionary read");
@@ -396,12 +406,12 @@ int save_brain(char *name, const char *filename) {
 	if (fwrite(COOKIE, sizeof(char), strlen(COOKIE), fd) != strlen(COOKIE)) return -EIO;
 	if (!fwrite(&tmp8, sizeof(tmp8), 1, fd)) return -EIO;
 
-	ret = save_tree(fd, dict_size, dict_words, brain, &forward); /* forward */
+	ret = save_tree(fd, dict_size, dict_words, dict_idx, brain, &forward); /* forward */
 	if (ret) goto fail;
 
 	log_info("save_brain", 0, "Forward tree saved");
 
-	ret = save_tree(fd, dict_size, dict_words, brain, &backward); /* backward */
+	ret = save_tree(fd, dict_size, dict_words, dict_idx, brain, &backward); /* backward */
 	if (ret) goto fail;
 
 	log_info("save_brain", 0, "Backward tree saved");
@@ -411,7 +421,7 @@ int save_brain(char *name, const char *filename) {
 
 	log_info("save_brain", dict_size, "Dictionary saved");
 
-	free_saved_dict(&dict_size, &dict_words, &dict_text);
+	free_saved_dict(&dict_size, &dict_words, &dict_idx, &dict_text);
 
 fail:
 	fclose(fd);

@@ -46,4 +46,4 @@ int db_model_link(db_tree *parent, db_tree *child);                          /* 
 int db_model_node_fill(brain_t brain, db_tree *node);                        /* load children */
 void db_model_node_free(db_tree **node);                                     /* free node data (recursively) */
 
-int db_model_dump_words(brain_t brain, uint_fast32_t *dict_size, word_t **dict_words, char ***dict_text);
+int db_model_dump_words(brain_t brain, uint_fast32_t *dict_size, word_t **dict_words, uint32_t **dict_idx, char ***dict_text);
