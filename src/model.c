@@ -428,3 +428,54 @@ fail:
 	fclose(fd);
 	return ret;
 }
+
+int model_alloc(brain_t brain, model_t **model) {
+	model_t *model_p;
+	number_t i;
+	int ret;
+
+	*model = malloc(sizeof(model_t));
+	if (*model == NULL) return -ENOMEM;
+	model_p = *model;
+
+	ret = db_model_get_order(brain, &model_p->order);
+	if (ret) goto fail;
+
+	model_p->contexts = malloc(sizeof(db_tree *) * model_p->order);
+	if (model_p->contexts == NULL) { ret = -ENOMEM; goto fail; }
+	for (i = 0; i < model_p->order; i++)
+		model_p->contexts[i] = NULL;
+
+	ret = db_model_get_root(brain, &model_p->forward, &model_p->backward);
+	if (ret) goto fail;
+
+	return OK;
+
+fail:
+	if (model_p->contexts != NULL)
+		free(model_p->contexts);
+
+	free(*model);
+	*model = NULL;
+	return ret;
+}
+
+void model_free(model_t **model) {
+	model_t *model_p;
+	number_t i;
+
+	if (*model == NULL) return;
+	model_p = *model;
+
+	for (i = 0; i < model_p->order; i++)
+		if (model_p->contexts[i] != NULL
+				&& model_p->contexts[i] != model_p->forward
+				&& model_p->contexts[i] != model_p->backward)
+			db_model_node_free(&model_p->contexts[i]);
+
+	db_model_node_free(&model_p->forward);
+	db_model_node_free(&model_p->backward);
+
+	free(*model);
+	*model = NULL;
+}
