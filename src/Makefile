@@ -11,20 +11,21 @@ clean:
 	rm -f *.o $(BIN)
 
 DB_OBJS=db.o db_conn_$(DB).o db_brain_$(DB).o db_word_$(DB).o db_list_$(DB).o db_map_$(DB).o db_model_$(DB).o
+MH_OBJS=megahal.o megahal_string.o
 
 BRAIN=brain.o dict.o model.o console.o $(DB_OBJS)
 brain: $(BRAIN)
 
-TRAIN=train.o megahal.o console.o $(DB_OBJS)
+TRAIN=train.o $(MH_OBJS) console.o $(DB_OBJS)
 train: $(TRAIN)
 
-LEARN=learn.o megahal.o quiet.o $(DB_OBJS)
+LEARN=learn.o $(MH_OBJS) quiet.o $(DB_OBJS)
 learn: $(LEARN)
 
-GETREPLY=getreply.o megahal.o quiet.o $(DB_OBJS)
+GETREPLY=getreply.o $(MH_OBJS) quiet.o $(DB_OBJS)
 getreply: $(GETREPLY)
 
-HAL=hal.o megahal.o quiet.o $(DB_OBJS)
+HAL=hal.o $(MH_OBJS) quiet.o $(DB_OBJS)
 hal: $(HAL)
 
 db.h: types.h err.h

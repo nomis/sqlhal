@@ -2,3 +2,6 @@
 
 int megahal_process(brain_t brain, const char *input, char **output, uint8_t flags);
 int megahal_train(brain_t brain, const char *filename);
+
+void megahal_capitalise(char *string);
+void megahal_upper(char *string);
