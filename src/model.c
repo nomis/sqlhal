@@ -6,6 +6,7 @@
 #include "err.h"
 #include "types.h"
 #include "db.h"
+#include "model.h"
 #include "output.h"
 
 #define COOKIE "MegaHALv8"
@@ -283,7 +284,7 @@ int save_tree(FILE *fd, uint_fast32_t dict_size, word_t *dict_words, uint32_t *d
 	return OK;
 }
 
-int load_brain(char *name, const char *filename) {
+int load_brain(const char *name, const char *filename) {
 	FILE *fd;
 	int ret = OK;
 	brain_t brain;
@@ -366,7 +367,7 @@ fail:
 	return ret;
 }
 
-int save_brain(char *name, const char *filename) {
+int save_brain(const char *name, const char *filename) {
 	FILE *fd;
 	int ret = OK;
 	brain_t brain;

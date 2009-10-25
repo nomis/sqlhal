@@ -46,5 +46,5 @@ db_list_postgres.o: db.h db_postgres.h $(STD_H)
 db_map_postgres.o: db.h db_postgres.h $(STD_H)
 db_model_postgres.o: db.h db_postgres.h $(STD_H)
 megahal.o: dict.h model.h db.h $(STD_H)
-model.o: db.h $(STD_H)
+model.o: db.h model.h $(STD_H)
 quiet.o: output.h
