@@ -263,7 +263,7 @@ int save_tree(FILE *fd, uint_fast32_t dict_size, word_t *dict_words, uint32_t *d
 	count = tree_p->count > UINT16_MAX ? UINT16_MAX : tree_p->count;
 
 	if (tree_p->children > UINT16_MAX)
-		return -EFAULT;
+		return -ENOSPC;
 	branch = tree_p->children;
 
 	if (!fwrite(&symbol, sizeof(symbol), 1, fd)) return -EIO;

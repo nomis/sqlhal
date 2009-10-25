@@ -459,8 +459,14 @@ int db_model_dump_words(brain_t brain, uint_fast32_t *dict_size, word_t **dict_w
 			return -ENOMEM;
 		}
 
+		if (*dict_size >= UINT32_MAX) {
+			PQclear(res);
+			return -ENOSPC;
+		}
+
 		(*dict_size)++;
-		if (*dict_size <= 0 || *dict_size > UINT32_MAX) {
+
+		if (*dict_size <= 0) {
 			PQclear(res);
 			return -ENOSPC;
 		}
