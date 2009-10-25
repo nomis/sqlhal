@@ -12,6 +12,7 @@ int db_brain_use(const char *brain, brain_t *ref);                           /* 
 int db_word_add(const char *word, word_t *ref);                              /* add word (does not exist) */
 int db_word_get(const char *word, word_t *ref);                              /* return -ENOTFOUND if word does not exist */
 int db_word_use(const char *word, word_t *ref);                              /* get or add word */
+int db_word_str(word_t ref, char **word);                                    /* convert word to string */
 
 int db_list_zap(brain_t brain, enum list type);                              /* clears table */
 int db_list_add(brain_t brain, enum list type, word_t word);                 /* add word (does not exist) */

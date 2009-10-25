@@ -203,6 +203,10 @@ int db_connect(void) {
 			if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
 			PQclear(res);
 
+			res = PQprepare(conn, "word_str", "SELECT word FROM words WHERE id = $1", 1, NULL);
+			if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
+			PQclear(res);
+
 			/* LIST */
 
 			res = PQprepare(conn, "list_add", "INSERT INTO lists (brain, type, word) VALUES($1, $2, $3)", 3, NULL);
@@ -348,6 +352,9 @@ int db_disconnect(void) {
 	PQclear(res);
 
 	res = PQexec(conn, "DEALLOCATE PREPARE word_get");
+	PQclear(res);
+
+	res = PQexec(conn, "DEALLOCATE PREPARE word_str");
 	PQclear(res);
 
 	/* LIST */

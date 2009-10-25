@@ -67,3 +67,41 @@ end:
 	PQclear(res);
 	return -ENOTFOUND;
 }
+
+int db_word_str(word_t ref, char **word) {
+	PGresult *res;
+	const char *param[1];
+	char tmp[1][32];
+	char *text;
+
+	if (ref == 0 || word == NULL) return -EINVAL;
+	if (db_connect()) return -EDB;
+
+	SET_PARAM(param, tmp, 0, ref);
+
+	res = PQexecPrepared(conn, "word_str", 1, param, NULL, NULL, 0);
+	if (PQresultStatus(res) != PGRES_TUPLES_OK) goto fail;
+	if (PQntuples(res) == 0) goto end;
+
+	text = PQgetvalue(res, 0, 0);
+	if (text == NULL) goto fail;
+
+	*word = strdup(text);
+	if (*word == NULL) {
+		PQclear(res);
+		return -ENOMEM;
+	}
+
+	PQclear(res);
+
+	return OK;
+
+fail:
+	log_error("db_word_str", PQresultStatus(res), PQresultErrorMessage(res));
+	PQclear(res);
+	return -EDB;
+
+end:
+	PQclear(res);
+	return -ENOTFOUND;
+}
