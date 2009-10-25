@@ -2,6 +2,11 @@
 #include <stdint.h>
 #include <string.h>
 
+#include "types.h"
+#include "err.h"
+#include "db.h"
+#include "dict.h"
+
 void megahal_capitalise(char *string) {
 	size_t i, len;
 	int start = 1;
@@ -30,3 +35,9 @@ void megahal_upper(char *string) {
 		string[i] = (unsigned char)toupper((unsigned char)string[i]);
 }
 
+int megahal_parse(const char *string, list_t **words) {
+	(void)string;
+	(void)words;
+
+	return -EFAULT;
+}

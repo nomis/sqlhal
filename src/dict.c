@@ -6,6 +6,7 @@
 #include "err.h"
 #include "types.h"
 #include "db.h"
+#include "dict.h"
 
 int load_list(const char *name, enum list type, const char *filename) {
 	FILE *fd;
@@ -209,4 +210,176 @@ int save_map(const char *name, enum map type, const char *filename) {
 fail:
 	fclose(fd);
 	return ret;
+}
+
+dict_t *dict_alloc(void) {
+	dict_t *dict;
+
+	dict = malloc(sizeof(dict_t));
+	if (dict == NULL) return NULL;
+
+	dict->words = NULL;
+
+	return dict;
+}
+
+int dict_add(dict_t *dict, word_t word, uint32_t *pos) {
+	uint_fast32_t i;
+	uint32_t tmp;
+	void *mem;
+	int ret;
+
+	if (dict == NULL) return -EINVAL;
+	if (pos == NULL) pos = &tmp;
+	if (word == 0)
+		return -EINVAL;
+
+	ret = dict_find(dict, word, pos);
+	if (ret != -ENOTFOUND) return ret;
+
+	if (dict->size >= UINT32_MAX)
+		return -ENOSPC;
+
+	dict->size++;
+
+	if (dict->size <= 0)
+		return -EFAULT;
+
+	mem = realloc(dict->words, sizeof(word_t) * dict->size);
+	if (mem == NULL) return -ENOMEM;
+	dict->words = mem;
+
+	for (i = *pos + 1; i < dict->size; i++)
+		dict->words[i] = dict->words[i - 1];
+	dict->words[*pos] = word;
+
+	return OK;
+}
+
+int dict_del(dict_t *dict, word_t word, uint32_t *pos) {
+	uint_fast32_t i;
+	uint32_t tmp;
+	void *mem;
+	int ret;
+
+	if (dict == NULL) return -EINVAL;
+	if (pos == NULL) pos = &tmp;
+	if (word == 0)
+		return -EINVAL;
+
+	ret = dict_find(dict, word, pos);
+	if (ret != OK) return ret;
+
+	dict->size--;
+
+	for (i = *pos; i < dict->size; i++)
+		dict->words[i] = dict->words[i + 1];
+
+	mem = realloc(dict->words, sizeof(word_t) * dict->size);
+	if (mem == NULL) return -ENOMEM;
+	dict->words = mem;
+
+	return OK;
+}
+
+int dict_size(dict_t *dict, uint32_t *size) {
+	if (dict == NULL || size == NULL) return -EINVAL;
+	*size = dict->size;
+	return OK;
+}
+
+int dict_find(dict_t *dict, word_t word, uint32_t *pos) {
+	uint_fast32_t min = 0;
+	uint_fast32_t tmp;
+	uint_fast32_t max;
+	int ret;
+
+	if (dict == NULL) return -EINVAL;
+	if (word == 0)
+		return -EINVAL;
+
+	max = dict->size - 1;
+
+	while (1) {
+		tmp = (min + max) / 2;
+
+		if (word == dict->words[tmp]) {
+			ret = OK;
+			goto done;
+		} else if (word > dict->words[tmp]) {
+			if (max == tmp) {
+				ret = -ENOTFOUND;
+				tmp++;
+				goto done;
+			}
+			min = tmp + 1;
+		} else {
+			if (min == tmp) {
+				ret = -ENOTFOUND;
+				goto done;
+			}
+			max = tmp - 1;
+		}
+	}
+
+done:
+	if (pos != NULL)
+		*pos = tmp;
+	return ret;
+}
+
+void dict_free(dict_t **dict) {
+	dict_t *dict_p;
+
+	if (*dict == NULL) return;
+	dict_p = *dict;
+
+	free(dict_p->words);
+	free(*dict);
+	*dict = NULL;
+}
+
+list_t *list_alloc(void) {
+	list_t *list;
+
+	list = malloc(sizeof(list_t));
+	if (list == NULL) return NULL;
+
+	list->words = NULL;
+
+	return list;
+}
+
+int list_append(list_t *list, word_t word) {
+	void *mem;
+
+	if (list == NULL) return -EINVAL;
+	if (word == 0)
+		return -EINVAL;
+
+	if (list->size >= UINT32_MAX)
+		return -ENOSPC;
+
+	list->size++;
+
+	if (list->size <= 0)
+		return -EFAULT;
+
+	mem = realloc(list->words, sizeof(word_t) * list->size);
+	if (mem == NULL) return -ENOMEM;
+	list->words = mem;
+
+	list->words[list->size - 1] = word;
+	return OK;
+}
+
+void list_free(list_t **list) {
+	list_t *list_p;
+
+	if (*list == NULL) return;
+	list_p = *list;
+
+	free(list_p->words);
+	free(*list);
+	*list = NULL;
 }
