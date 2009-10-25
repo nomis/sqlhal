@@ -12,7 +12,7 @@ int getreply_text(const char *name, const char *text, char **reply) {
 	int ret = OK;
 	brain_t brain;
 
-	if (name == NULL || text == NULL) return -EINVAL;
+	if (name == NULL) return -EINVAL;
 
 	ret = db_brain_use(name, &brain);
 	if (ret) goto fail;
@@ -54,7 +54,7 @@ int main(int argc, char *argv[]) {
 		return 1;
 	}
 
-	while (argc == 2) {
+	while (argc == 2 || text != NULL) {
 		if (text == NULL) {
 			if (fgets(buffer, 1024, stdin) == NULL) {
 				break;
@@ -63,20 +63,19 @@ int main(int argc, char *argv[]) {
 			}
 		}
 
-		if (text == NULL || strlen(text) == 0) {
+		if (text != NULL && strlen(text) == 0)
+			text = NULL;
+
+		reply = NULL;
+		ret = getreply_text(name, text, &reply);
+		if (ret) {
+			fprintf(stderr, "<Unable to get reply for text (%d)>\n", ret);
+			fail = 1;
 			break;
 		} else {
+			printf("%s\n", reply);
+			free(reply);
 			reply = NULL;
-			ret = getreply_text(name, text, &reply);
-			if (ret) {
-				fprintf(stderr, "<Unable to get reply for text (%d)>\n", ret);
-				fail = 1;
-				break;
-			} else {
-				printf("%s\n", reply);
-				free(reply);
-				reply = NULL;
-			}
 		}
 
 		text = NULL;
