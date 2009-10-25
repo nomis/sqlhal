@@ -17,7 +17,7 @@ int hal_text(const char *name, const char *text, char **reply) {
 	ret = db_brain_use(name, &brain);
 	if (ret) goto fail;
 
-	ret = megahal_process(brain, text, reply, MEGAHAL_LEARN|MEGAHAL_REPLY);
+	ret = megahal_process(brain, text, reply, MEGAHAL_F_LEARN);
 	if (ret) goto fail;
 
 fail:
