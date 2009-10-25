@@ -375,6 +375,26 @@ int list_append(list_t *list, word_t word) {
 	return OK;
 }
 
+int list_get(list_t *list, uint32_t pos, word_t *word) {
+	if (list == NULL || word == NULL) return -EINVAL;
+	if (pos >= list->size) return -ENOTFOUND;
+	*word = list->words[pos];
+	return OK;
+}
+
+int list_set(list_t *list, uint32_t pos, word_t word) {
+	if (list == NULL || word == 0) return -EINVAL;
+	if (pos >= list->size) return -ENOTFOUND;
+	list->words[pos] = word;
+	return OK;
+}
+
+int list_size(list_t *list, uint32_t *size) {
+	if (list == NULL || size == NULL) return -EINVAL;
+	*size = list->size;
+	return OK;
+}
+
 void list_free(list_t **list) {
 	list_t *list_p;
 
