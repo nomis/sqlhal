@@ -28,13 +28,8 @@ int db_word_add(const char *word, word_t *ref) {
 	if (PQresultStatus(res) != PGRES_TUPLES_OK) goto fail;
 	if (PQntuples(res) != 1) goto fail;
 
-	if (sizeof(word_t) == sizeof(unsigned long int)) {
-		*ref = strtoul(PQgetvalue(res, 0, 0), NULL, 10);
-	} else if (sizeof(word_t) == sizeof(unsigned long long int)) {
-		*ref = strtoull(PQgetvalue(res, 0, 0), NULL, 10);
-	} else {
-		return -EFAULT;
-	}
+	GET_VALUE(res, 0, 0, *ref);
+
 	PQclear(res);
 
 	return OK;
@@ -57,13 +52,8 @@ int db_word_get(const char *word, word_t *ref) {
 	if (PQresultStatus(res) != PGRES_TUPLES_OK) goto fail;
 	if (PQntuples(res) == 0) goto end;
 
-	if (sizeof(word_t) == sizeof(unsigned long int)) {
-		*ref = strtoul(PQgetvalue(res, 0, 0), NULL, 10);
-	} else if (sizeof(word_t) == sizeof(unsigned long long int)) {
-		*ref = strtoull(PQgetvalue(res, 0, 0), NULL, 10);
-	} else {
-		return -EFAULT;
-	}
+	GET_VALUE(res, 0, 0, *ref);
+
 	PQclear(res);
 
 	return OK;

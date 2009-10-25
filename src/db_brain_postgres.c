@@ -28,13 +28,8 @@ int db_brain_add(const char *brain, brain_t *ref) {
 	if (PQresultStatus(res) != PGRES_TUPLES_OK) goto fail;
 	if (PQntuples(res) != 1) goto fail;
 
-	if (sizeof(brain_t) == sizeof(unsigned long int)) {
-		*ref = strtoul(PQgetvalue(res, 0, 0), NULL, 10);
-	} else if (sizeof(brain_t) == sizeof(unsigned long long int)) {
-		*ref = strtoull(PQgetvalue(res, 0, 0), NULL, 10);
-	} else {
-		return -EFAULT;
-	}
+	GET_VALUE(res, 0, 0, *ref);
+
 	PQclear(res);
 
 	return OK;
@@ -57,13 +52,8 @@ int db_brain_get(const char *brain, brain_t *ref) {
 	if (PQresultStatus(res) != PGRES_TUPLES_OK) goto fail;
 	if (PQntuples(res) == 0) goto end;
 
-	if (sizeof(brain_t) == sizeof(unsigned long int)) {
-		*ref = strtoul(PQgetvalue(res, 0, 0), NULL, 10);
-	} else if (sizeof(brain_t) == sizeof(unsigned long long int)) {
-		*ref = strtoull(PQgetvalue(res, 0, 0), NULL, 10);
-	} else {
-		return -EFAULT;
-	}
+	GET_VALUE(res, 0, 0, *ref);
+
 	PQclear(res);
 
 	return OK;
