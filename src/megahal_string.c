@@ -1,5 +1,8 @@
+#define _GNU_SOURCE
+
 #include <ctype.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "types.h"
@@ -35,9 +38,128 @@ void megahal_upper(char *string) {
 		string[i] = (unsigned char)toupper((unsigned char)string[i]);
 }
 
-int megahal_parse(const char *string, list_t **words) {
-	(void)string;
-	(void)words;
+/* Return whether or not a word boundary exists in a string at the specified location. */
+int boundary(const char *string, uint_fast32_t position, uint_fast32_t len) {
+	if (position == 0)
+		return 0;
 
-	return -EFAULT;
+	if (position == len)
+		return 1;
+
+	if (
+		(string[position] == '\'')
+		&& (isalpha((unsigned char)string[position - 1]) != 0)
+		&& (isalpha((unsigned char)string[position + 1]) != 0)
+	)
+		return 0;
+
+	if (
+		(position > 1)
+		&& (string[position-1] == '\'')
+		&& (isalpha((unsigned char)string[position - 2]) != 0)
+		&& (isalpha((unsigned char)string[position]) != 0)
+	)
+		return 0;
+
+	if (
+		(isalpha((unsigned char)string[position]) != 0)
+		&& (isalpha((unsigned char)string[position - 1]) == 0)
+	)
+		return 1;
+
+	if (
+		(isalpha((unsigned char)string[position]) == 0)
+		&& (isalpha((unsigned char)string[position - 1]) != 0)
+	)
+		return 1;
+
+	if (isdigit((unsigned char)string[position])
+		!= isdigit((unsigned char)string[position - 1])
+	)
+		return 1;
+
+	return 0;
+}
+
+int megahal_parse(const char *string, list_t **words) {
+	list_t *words_p;
+	uint_fast32_t offset, len;
+	uint32_t size;
+	word_t ref;
+	char *tmp;
+	int ret;
+
+	if (string == NULL || words == NULL) return -EINVAL;
+
+	*words = list_alloc();
+	if (*words == NULL) return -ENOMEM;
+	words_p = *words;
+
+	len = strlen(string);
+	if (len == 0) return OK;
+
+	offset = 0;
+	while (1) {
+		/*
+		 * If the current character is of the same type as the previous
+		 * character, then include it in the word. Otherwise, terminate
+		 * the current word.
+		 */
+		if (boundary(string, offset, len)) {
+			/*
+			 * Add the word to the dictionary
+			 */
+			tmp = strndup(string, offset);
+			if (tmp == NULL) return -ENOMEM;
+
+			ret = db_word_use(tmp, &ref);
+			free(tmp);
+			if (ret) return ret;
+
+			ret = list_append(words_p, ref);
+			if (ret) return ret;
+
+			if (offset == len) break;
+			string += offset;
+			offset = 0;
+		} else {
+			offset++;
+		}
+	}
+
+	/*
+	 * If the last word isn't punctuation, then replace it with a
+	 * full-stop character.
+	 */
+	tmp = NULL;
+	ret = list_size(words_p, &size);
+	if (ret) return ret;
+
+	ret = list_get(words_p, size - 1, &ref);
+	if (ret) return ret;
+
+	ret = db_word_str(ref, &tmp);
+	if (ret) return ret;
+
+	if (isalnum((unsigned char)tmp[0])) {
+		free(tmp);
+
+		ret = db_word_use(".", &ref);
+		if (ret) return ret;
+
+		ret = list_append(words_p, ref);
+		if (ret) return ret;
+	} else if (strchr("!.?", (unsigned char)tmp[strlen(tmp) - 1]) == NULL) {
+		free(tmp);
+
+		ret = db_word_use(".", &ref);
+		if (ret) return ret;
+
+		ret = list_set(words_p, size - 1, ref);
+		if (ret) return ret;
+	} else {
+		free(tmp);
+	}
+
+	return OK;
 }
