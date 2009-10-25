@@ -7,7 +7,6 @@
 #include "err.h"
 #include "db.h"
 #include "megahal.h"
-#include "output.h"
 
 int getreply_text(const char *name, const char *text, char **reply) {
 	int ret = OK;
@@ -32,7 +31,6 @@ int main(int argc, char *argv[]) {
 	char *reply;
 	int ret;
 	int fail = 0;
-	char *state;
 
 	if (argc != 2 && argc != 3) {
 		printf("Brain access for responses\n");
@@ -44,61 +42,65 @@ int main(int argc, char *argv[]) {
 	name = argv[1];
 	text = argc == 3 ? argv[2] : NULL;
 
-	state = "db_connect";
 	ret = db_connect();
-	if (ret) goto fail;
-	else log_info("getreply", ret, state);
-
-	state = "db_begin";
-	ret = db_begin();
-	if (ret) goto fail;
-	else log_info("getreply", ret, state);
-
-	if (text == NULL) {
-		state = "read_text";
-		if (fgets(buffer, 1024, stdin) == NULL) {
-			log_fatal("getreply", -EIO, state);
-			fail = 1;
-		} else {
-			text = strtok(buffer, "\r\n");
-		}
+	if (ret) {
+		fprintf(stderr, "<Unable to connect to database (%d)>\n", ret);
+		return 1;
 	}
 
-	state = "getreply_text";
-	if (!fail && (text == NULL || strlen(text) == 0)) {
-		log_fatal("getreply", -EINVAL, state);
-		fail = 1;
-	} else {
-		reply = NULL;
-		ret = getreply_text(name, text, &reply);
-		if (ret) { log_warn("getreply", ret, state); fail = 1; }
-		else if (reply == NULL || strlen(reply) == 0) {
-			log_warn("getreply", ret, state);
-			fail = 1;
+	ret = db_begin();
+	if (ret) {
+		fprintf(stderr, "<Unable to begin database transaction (%d)>\n", ret);
+		return 1;
+	}
+
+	while (argc == 2) {
+		if (text == NULL) {
+			if (fgets(buffer, 1024, stdin) == NULL) {
+				break;
+			} else {
+				text = strtok(buffer, "\r\n");
+			}
 		}
-		else log_info("megahal-reply", ret, reply);
+
+		if (text == NULL || strlen(text) == 0) {
+			break;
+		} else {
+			reply = NULL;
+			ret = getreply_text(name, text, &reply);
+			if (ret) {
+				fprintf(stderr, "<Unable to get reply for text (%d)>\n", ret);
+				fail = 1;
+				break;
+			} else {
+				printf("%s\n", reply);
+				free(reply);
+				reply = NULL;
+			}
+		}
+
+		text = NULL;
 	}
 
 	if (fail) {
-		state = "db_rollback";
 		ret = db_rollback();
-		if (ret) goto fail;
-		else log_info("getreply", ret, state);
+		if (ret) {
+			fprintf(stderr, "<Unable to rollback database transaction (%d)>\n", ret);
+			return 1;
+		}
 	} else {
-		state = "db_commit";
 		ret = db_commit();
-		if (ret) goto fail;
-		else log_info("getreply", ret, state);
+		if (ret) {
+			fprintf(stderr, "<Unable to commit database transaction (%d)>\n", ret);
+			return 1;
+		}
 	}
 
-	state = "db_disconnect";
 	ret = db_disconnect();
-	if (ret) goto fail;
-	else log_info("getreply", ret, state);
+	if (ret) {
+		fprintf(stderr, "<Unable to disconnect from database (%d)>\n", ret);
+		return 1;
+	}
 
-	return 0;
-
-fail:
-	log_fatal("getreply", ret, state);
-	return 1;
+	return fail ? 1 : 0;
 }

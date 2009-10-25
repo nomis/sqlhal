@@ -18,15 +18,15 @@ TRAIN=train.o megahal.o console.o $(DB_OBJS)
 train: $(TRAIN)
 	$(CC) -o $@ $(TRAIN) -lpq
 
-LEARN=learn.o megahal.o console.o $(DB_OBJS)
+LEARN=learn.o megahal.o quiet.o $(DB_OBJS)
 learn: $(LEARN)
 	$(CC) -o $@ $(LEARN) -lpq
 
-GETREPLY=getreply.o megahal.o console.o $(DB_OBJS)
+GETREPLY=getreply.o megahal.o quiet.o $(DB_OBJS)
 getreply: $(GETREPLY)
 	$(CC) -o $@ $(GETREPLY) -lpq
 
-HAL=hal.o megahal.o console.o $(DB_OBJS)
+HAL=hal.o megahal.o quiet.o $(DB_OBJS)
 hal: $(HAL)
 	$(CC) -o $@ $(HAL) -lpq
 
@@ -37,7 +37,6 @@ train.o: megahal.h output.h db.h
 learn.o: megahal.h output.h db.h
 getreply.o: megahal.h output.h db.h
 hal.o: megahal.h output.h db.h
-megahal.o: dict.h model.h db.h
 
 console.o: output.h
 dict.o: db.h $(STD_H)
@@ -48,4 +47,6 @@ db_word_postgres.o: db.h db_postgres.h $(STD_H)
 db_list_postgres.o: db.h db_postgres.h $(STD_H)
 db_map_postgres.o: db.h db_postgres.h $(STD_H)
 db_model_postgres.o: db.h db_postgres.h $(STD_H)
+megahal.o: dict.h model.h db.h $(STD_H)
 model.o: db.h $(STD_H)
+quiet.o: output.h

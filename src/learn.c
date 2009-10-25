@@ -7,7 +7,6 @@
 #include "err.h"
 #include "db.h"
 #include "megahal.h"
-#include "output.h"
 
 int learn_text(const char *name, const char *text) {
 	int ret = OK;
@@ -31,7 +30,6 @@ int main(int argc, char *argv[]) {
 	char *text;
 	int ret;
 	int fail = 0;
-	char *state;
 
 	if (argc != 2 && argc != 3) {
 		printf("Brain access for learning\n");
@@ -43,56 +41,60 @@ int main(int argc, char *argv[]) {
 	name = argv[1];
 	text = argc == 3 ? argv[2] : NULL;
 
-	state = "db_connect";
 	ret = db_connect();
-	if (ret) goto fail;
-	else log_info("learn", ret, state);
-
-	state = "db_begin";
-	ret = db_begin();
-	if (ret) goto fail;
-	else log_info("learn", ret, state);
-
-	if (text == NULL) {
-		state = "read_text";
-		if (fgets(buffer, 1024, stdin) == NULL) {
-			log_fatal("learn", -EIO, state);
-			fail = 1;
-		} else {
-			text = strtok(buffer, "\r\n");
-		}
+	if (ret) {
+		fprintf(stderr, "<Unable to connect to database (%d)>\n", ret);
+		return 1;
 	}
 
-	state = "learn_text";
-	if (!fail && (text == NULL || strlen(text) == 0)) {
-		log_fatal("learn", -EINVAL, state);
-		fail = 1;
-	} else {
-		ret = learn_text(name, text);
-		if (ret) { log_warn("learn", ret, state); fail = 1; }
-		else log_info("learn", ret, state);
+	ret = db_begin();
+	if (ret) {
+		fprintf(stderr, "<Unable to begin database transaction (%d)>\n", ret);
+		return 1;
+	}
+
+	while (argc == 2) {
+		if (text == NULL) {
+			if (fgets(buffer, 1024, stdin) == NULL) {
+				break;
+			} else {
+				text = strtok(buffer, "\r\n");
+			}
+		}
+
+		if (text == NULL || strlen(text) == 0) {
+			break;
+		} else {
+			ret = learn_text(name, text);
+			if (ret) {
+				fprintf(stderr, "<Unable to learn text (%d)>\n", ret);
+				fail = 1;
+				break;
+			}
+		}
+
+		text = NULL;
 	}
 
 	if (fail) {
-		state = "db_rollback";
 		ret = db_rollback();
-		if (ret) goto fail;
-		else log_info("learn", ret, state);
+		if (ret) {
+			fprintf(stderr, "<Unable to rollback database transaction (%d)>\n", ret);
+			return 1;
+		}
 	} else {
-		state = "db_commit";
 		ret = db_commit();
-		if (ret) goto fail;
-		else log_info("learn", ret, state);
+		if (ret) {
+			fprintf(stderr, "<Unable to commit database transaction (%d)>\n", ret);
+			return 1;
+		}
 	}
 
-	state = "db_disconnect";
 	ret = db_disconnect();
-	if (ret) goto fail;
-	else log_info("learn", ret, state);
+	if (ret) {
+		fprintf(stderr, "<Unable to disconnect from database (%d)>\n", ret);
+		return 1;
+	}
 
-	return 0;
-
-fail:
-	log_fatal("learn", ret, state);
-	return 1;
+	return fail ? 1 : 0;
 }
