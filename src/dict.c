@@ -218,6 +218,7 @@ dict_t *dict_alloc(void) {
 	dict = malloc(sizeof(dict_t));
 	if (dict == NULL) return NULL;
 
+	dict->size = 0;
 	dict->words = NULL;
 
 	return dict;
@@ -345,6 +346,7 @@ list_t *list_alloc(void) {
 	list = malloc(sizeof(list_t));
 	if (list == NULL) return NULL;
 
+	list->size = 0;
 	list->words = NULL;
 
 	return list;
