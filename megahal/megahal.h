@@ -70,9 +70,10 @@
 
 #define COMMAND_SIZE (sizeof(command)/sizeof(command[0]))
 
-#define BYTE1 unsigned char
-#define BYTE2 unsigned short
-#define BYTE4 unsigned long
+#include <stdint.h>
+#define BYTE1 uint8_t
+#define BYTE2 uint16_t
+#define BYTE4 uint32_t
 
 #define SEP "/"
 
