@@ -1,6 +1,8 @@
-DB=postgres
-CFLAGS=-Wall -Wextra -Wshadow -Werror -g -O0
+CFLAGS += -g -O0
+override CFLAGS += -Wall -Wextra -Wshadow -Werror
+LDLIBS += -lpq
 
+DB=postgres
 STD_H=err.h types.h
 BIN=brain train learn getreply hal
 
@@ -12,23 +14,18 @@ DB_OBJS=db.o db_conn_$(DB).o db_brain_$(DB).o db_word_$(DB).o db_list_$(DB).o db
 
 BRAIN=brain.o dict.o model.o console.o $(DB_OBJS)
 brain: $(BRAIN)
-	$(CC) -o $@ $(BRAIN) -lpq
 
 TRAIN=train.o megahal.o console.o $(DB_OBJS)
 train: $(TRAIN)
-	$(CC) -o $@ $(TRAIN) -lpq
 
 LEARN=learn.o megahal.o quiet.o $(DB_OBJS)
 learn: $(LEARN)
-	$(CC) -o $@ $(LEARN) -lpq
 
 GETREPLY=getreply.o megahal.o quiet.o $(DB_OBJS)
 getreply: $(GETREPLY)
-	$(CC) -o $@ $(GETREPLY) -lpq
 
 HAL=hal.o megahal.o quiet.o $(DB_OBJS)
 hal: $(HAL)
-	$(CC) -o $@ $(HAL) -lpq
 
 db.h: types.h err.h
 
