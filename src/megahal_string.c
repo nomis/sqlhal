@@ -122,6 +122,7 @@ int megahal_parse(const char *string, list_t **words) {
 
 			if (offset == len) break;
 			string += offset;
+			len = strlen(string);
 			offset = 0;
 		} else {
 			offset++;
