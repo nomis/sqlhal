@@ -260,14 +260,11 @@ int db_model_get_root(brain_t brain, db_tree **forward, db_tree **backward) {
 		forward_p = *forward;
 
 		GET_VALUE(res, 0, 0, forward_p->id);
-
-		ret = db_model_node_fill(brain, forward_p);
-		if (ret) { PQclear(res); return ret; }
 	} else {
 		ret = db_model_create(brain, forward);
 		if (ret) { PQclear(res); return ret; }
-
 		forward_p = *forward;
+
 		created = 1;
 	}
 
@@ -277,14 +274,11 @@ int db_model_get_root(brain_t brain, db_tree **forward, db_tree **backward) {
 		backward_p = *backward;
 
 		GET_VALUE(res, 0, 1, backward_p->id);
-
-		ret = db_model_node_fill(brain, backward_p);
-		if (ret) { PQclear(res); return ret; }
 	} else {
 		ret = db_model_create(brain, backward);
 		if (ret) { PQclear(res); return ret; }
-
 		backward_p = *backward;
+
 		created = 1;
 	}
 	PQclear(res);

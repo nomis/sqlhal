@@ -248,6 +248,9 @@ int save_tree(FILE *fd, uint_fast32_t dict_size, word_t *dict_words, uint32_t *d
 
 	tree_p = *tree;
 
+	ret = db_model_node_fill(brain, (db_tree *)tree_p->nodes[i]);
+	if (ret) return ret;
+
 	if (tree_p->word == 0) {
 		if (tree_p->parent_id == 0) {
 			symbol = TOKEN_ERROR_IDX;
@@ -275,9 +278,6 @@ int save_tree(FILE *fd, uint_fast32_t dict_size, word_t *dict_words, uint32_t *d
 	if (!fwrite(&branch, sizeof(branch), 1, fd)) return -EIO;
 
 	for (i = 0; i < tree_p->children; i++) {
-		ret = db_model_node_fill(brain, (db_tree *)tree_p->nodes[i]);
-		if (ret) return ret;
-
 		ret = save_tree(fd, dict_size, dict_words, dict_idx, brain, (db_tree **)&tree_p->nodes[i]);
 		if (ret) return ret;
 	}
