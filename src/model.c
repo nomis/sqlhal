@@ -235,7 +235,7 @@ int save_tree(FILE *fd, uint_fast32_t dict_size, word_t *dict_words, uint32_t *d
 	uint16_t count;
 	uint16_t branch;
 	int ret;
-	uint_fast16_t i;
+	uint_fast32_t i;
 
 	WARN_IF(fd == NULL);
 	WARN_IF(dict_words == NULL);
@@ -435,7 +435,7 @@ fail:
 
 int model_alloc(brain_t brain, model_t **model) {
 	model_t *model_p;
-	number_t i;
+	uint_fast32_t i;
 	int ret;
 
 	*model = malloc(sizeof(model_t));
@@ -466,7 +466,7 @@ fail:
 
 void model_free(model_t **model) {
 	model_t *model_p;
-	number_t i;
+	uint_fast32_t i;
 
 	if (*model == NULL) return;
 	model_p = *model;
