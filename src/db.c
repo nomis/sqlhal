@@ -30,3 +30,37 @@ int db_word_use(const char *word, word_t *ref) {
 		ret = db_word_add(word, ref);
 	return ret;
 }
+
+db_tree *db_model_node_alloc(void) {
+	db_tree *node;
+
+	node = malloc(sizeof(db_tree));
+	if (node == NULL) return NULL;
+
+	node->id = 0;
+	node->parent_id = 0;
+	node->word = 0;
+	node->usage = 0;
+	node->count = 0;
+
+	node->children = 0;
+	node->nodes = NULL;
+
+	return node;
+}
+
+void db_model_node_free(db_tree **node) {
+	db_tree *node_p;
+	number_t i;
+
+	if (node == NULL || *node == NULL) return;
+
+	node_p = *node;
+
+	for (i = 0; i < node_p->children; i++)
+		db_model_node_free((db_tree **)&node_p->nodes[i++]);
+	free(node_p->nodes);
+
+	free(*node);
+	*node = NULL;
+}
