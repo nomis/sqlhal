@@ -2,9 +2,8 @@ int load_brain(const char *name, const char *filename);
 int save_brain(const char *name, const char *filename);
 
 typedef struct {
+	brain_t brain;
 	number_t order;
-	db_tree *forward;
-	db_tree *backward;
 	db_tree **contexts;
 } model_t;
 

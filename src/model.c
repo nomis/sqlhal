@@ -442,6 +442,8 @@ int model_alloc(brain_t brain, model_t **model) {
 	if (*model == NULL) return -ENOMEM;
 	model_p = *model;
 
+	model_p->brain = brain;
+
 	ret = db_model_get_order(brain, &model_p->order);
 	if (ret) goto fail;
 
@@ -449,9 +451,6 @@ int model_alloc(brain_t brain, model_t **model) {
 	if (model_p->contexts == NULL) { ret = -ENOMEM; goto fail; }
 	for (i = 0; i < model_p->order; i++)
 		model_p->contexts[i] = NULL;
-
-	ret = db_model_get_root(brain, &model_p->forward, &model_p->backward);
-	if (ret) goto fail;
 
 	return OK;
 
