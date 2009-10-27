@@ -4,13 +4,18 @@
 #include "err.h"
 #include "types.h"
 #include "db.h"
+#include "megahal.h"
 
 int db_brain_use(const char *brain, brain_t *ref) {
 	int ret;
 
 	ret = db_brain_get(brain, ref);
-	if (ret == -ENOTFOUND)
+	if (ret == -ENOTFOUND) {
 		ret = db_brain_add(brain, ref);
+		if (ret) return ret;
+
+		ret = db_model_set_order(*ref, MEGAHAL_DEFAULT_ORDER);
+	}
 	return ret;
 }
 

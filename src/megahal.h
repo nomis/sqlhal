@@ -1,3 +1,4 @@
+#define MEGAHAL_DEFAULT_ORDER 5
 #define MEGAHAL_F_LEARN 0x01
 
 int megahal_process(brain_t brain, const char *input, char **output, uint8_t flags);

@@ -38,7 +38,7 @@ hal.o: megahal.h output.h db.h
 
 console.o: output.h
 dict.o: db.h dict.h $(STD_H)
-db.o: db.h $(STD_H)
+db.o: db.h megahal.h $(STD_H)
 db_conn_postgres.o: db.h db_postgres.h $(STD_H)
 db_brain_postgres.o: db.h db_postgres.h $(STD_H)
 db_word_postgres.o: db.h db_postgres.h $(STD_H)
