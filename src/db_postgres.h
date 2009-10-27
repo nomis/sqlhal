@@ -5,14 +5,14 @@ PGconn *conn;
 #define SET_PARAM(param, buf, pos, value) do { \
 	param[pos] = buf[pos]; \
 	if (sizeof(value) == sizeof(unsigned int)) { \
-		if (sprintf(buf[pos], "%u", (unsigned int)(value)) <= 0) return -EFAULT; \
+		BUG_IF(sprintf(buf[pos], "%u", (unsigned int)(value)) <= 0); \
 	} else if (sizeof(value) == sizeof(unsigned long int)) { \
-		if (sprintf(buf[pos], "%lu", (unsigned long int)(value)) <= 0) return -EFAULT; \
+		BUG_IF(sprintf(buf[pos], "%lu", (unsigned long int)(value)) <= 0); \
 	} else if (sizeof(value) == sizeof(unsigned long long int)) { \
-		if (sprintf(buf[pos], "%llu", (unsigned long long int)(value)) <= 0) return -EFAULT; \
+		BUG_IF(sprintf(buf[pos], "%llu", (unsigned long long int)(value)) <= 0); \
 	} else { \
 		log_fatal("SET_PARAM", sizeof(value), "Unhandled numeric sizeof"); \
-		return -EFAULT; \
+		BUG(); \
 	} \
 } while(0)
 
@@ -26,7 +26,7 @@ PGconn *conn;
 	} else { \
 		log_fatal("SET_PARAM", sizeof(lvalue), "Unhandled numeric sizeof"); \
 		PQclear(res); \
-		return -EFAULT; \
+		BUG(); \
 	} \
 } while(0)
 

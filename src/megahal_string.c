@@ -89,7 +89,8 @@ int megahal_parse(const char *string, list_t **words) {
 	char *tmp;
 	int ret;
 
-	if (string == NULL || words == NULL) return -EINVAL;
+	WARN_IF(string == NULL);
+	WARN_IF(words == NULL);
 
 	*words = list_alloc();
 	if (*words == NULL) return -ENOMEM;

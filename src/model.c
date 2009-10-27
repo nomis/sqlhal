@@ -29,8 +29,7 @@ int load_tree(FILE *fd, enum load_mode mode, uint_fast32_t dict_size, word_t *di
 	int ret;
 	uint_fast16_t i;
 
-	if (fd == NULL)
-		return -EINVAL;
+	WARN_IF(fd == NULL);
 
 	if (!fread(&symbol, sizeof(symbol), 1, fd)) return -EIO;
 	if (!fread(&usage, sizeof(usage), 1, fd)) return -EIO;
@@ -38,12 +37,13 @@ int load_tree(FILE *fd, enum load_mode mode, uint_fast32_t dict_size, word_t *di
 	if (!fread(&branch, sizeof(branch), 1, fd)) return -EIO;
 
 	if (mode == LOAD_STORE) {
-		if (dict_words == NULL || brain == 0 || tree == NULL)
-			return -EINVAL;
+		WARN_IF(dict_words == NULL);
+		WARN_IF(brain == 0);
+		WARN_IF(tree == NULL);
 
 		if (symbol >= dict_size) {
 			log_error("load_tree", symbol, "Symbol references beyond end of dictionary");
-			return -EINVAL;
+			WARN();
 		}
 
 		tree->word = dict_words[symbol];
@@ -100,7 +100,7 @@ int load_dict(FILE *fd, uint_fast32_t *dict_size, word_t **dict_words) {
 		case TOKEN_ERROR_IDX:
 			if (strcmp(tmp, TOKEN_ERROR)) {
 				log_error("load_dict", i, "Invalid word (not " TOKEN_ERROR ")");
-				return -EINVAL;
+				WARN();
 			}
 			(*dict_words)[i] = 0;
 			break;
@@ -108,7 +108,7 @@ int load_dict(FILE *fd, uint_fast32_t *dict_size, word_t **dict_words) {
 		case TOKEN_FIN_IDX:
 			if (strcmp(tmp, TOKEN_FIN)) {
 				log_error("load_dict", i, "Invalid word (not " TOKEN_FIN ")");
-				return -EINVAL;
+				WARN();
 			}
 			(*dict_words)[i] = 0;
 			break;
@@ -202,15 +202,14 @@ int find_word(uint_fast32_t dict_size, word_t *dict_words, uint32_t *dict_idx, w
 	uint_fast32_t pos;
 	uint_fast32_t max = dict_size - 1;
 
-	if (word == 0)
-		return -EINVAL;
+	WARN_IF(word == 0);
 
 	while (1) {
 		pos = (min + max) / 2;
 
 		if (word == dict_words[pos]) {
-			if (pos == TOKEN_ERROR_IDX || pos == TOKEN_FIN_IDX)
-				return -EFAULT;
+			BUG_IF(pos == TOKEN_ERROR_IDX);
+			BUG_IF(pos == TOKEN_FIN_IDX);
 			*symbol = dict_idx[pos];
 			return OK;
 		} else if (word > dict_words[pos]) {
@@ -238,8 +237,11 @@ int save_tree(FILE *fd, uint_fast32_t dict_size, word_t *dict_words, uint32_t *d
 	int ret;
 	uint_fast16_t i;
 
-	if (fd == NULL || dict_words == NULL || brain == 0 || tree == NULL || *tree == NULL)
-		return -EINVAL;
+	WARN_IF(fd == NULL);
+	WARN_IF(dict_words == NULL);
+	WARN_IF(brain == 0);
+	WARN_IF(tree == NULL);
+	WARN_IF(*tree == NULL);
 
 	if (dict_size > UINT16_MAX)
 		return -ENOSPC;
@@ -250,8 +252,8 @@ int save_tree(FILE *fd, uint_fast32_t dict_size, word_t *dict_words, uint32_t *d
 		if (tree_p->parent_id == 0) {
 			symbol = TOKEN_ERROR_IDX;
 		} else {
-			if (tree_p->usage != 0 || tree_p->children != 0)
-				return -EFAULT;
+			BUG_IF(tree_p->usage != 0);
+			BUG_IF(tree_p->children != 0);
 
 			symbol = TOKEN_FIN_IDX;
 		}
@@ -296,7 +298,8 @@ int load_brain(const char *name, const char *filename) {
 	db_tree *forward;
 	db_tree *backward;
 
-	if (name == NULL || filename == NULL) return -EINVAL;
+	WARN_IF(name == NULL);
+	WARN_IF(filename == NULL);
 
 	log_info("load_brain", 0, filename);
 
@@ -380,7 +383,8 @@ int save_brain(const char *name, const char *filename) {
 	db_tree *forward;
 	db_tree *backward;
 
-	if (name == NULL || filename == NULL) return -EINVAL;
+	WARN_IF(name == NULL);
+	WARN_IF(filename == NULL);
 
 	log_info("save_brain", 0, filename);
 

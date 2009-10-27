@@ -15,7 +15,8 @@ int load_list(const char *name, enum list type, const char *filename) {
 	int ret = OK;
 	brain_t brain;
 
-	if (name == NULL || filename == NULL) return -EINVAL;
+	WARN_IF(name == NULL);
+	WARN_IF(filename == NULL);
 
 	fd = fopen(filename, "r");
 	if (fd == NULL) return -EIO;
@@ -52,9 +53,10 @@ fail:
 int iter_list_item(void *data, word_t ref, const char *word) {
 	FILE *fd = data;
 	int ret;
-	(void)ref;
 
-	if (word == NULL || word[0] == 0) return -EFAULT;
+	BUG_IF(word == NULL);
+	BUG_IF(ref == 0);
+	BUG_IF(word[0] == 0);
 
 	ret = fprintf(fd, "%s\n", word);
 	if (ret <= 0) return -EIO;
@@ -67,7 +69,8 @@ int save_list(const char *name, enum list type, const char *filename) {
 	int ret = OK;
 	brain_t brain;
 
-	if (name == NULL || filename == NULL) return -EINVAL;
+	WARN_IF(name == NULL);
+	WARN_IF(filename == NULL);
 
 	fd = fopen(filename, "w");
 	if (fd == NULL) return -EIO;
@@ -91,8 +94,8 @@ int save_list(const char *name, enum list type, const char *filename) {
 			"#\n");
 		break;
 	default:
-		ret = -EFAULT;
-		goto fail;
+		fclose(fd);
+		BUG();
 	}
 
 	if (ret <= 0) {
@@ -105,6 +108,10 @@ int save_list(const char *name, enum list type, const char *filename) {
 
 	ret = db_list_iter(brain, type, iter_list_item, fd);
 	if (ret) goto fail;
+
+	if (fclose(fd) != 0)
+		return -EIO;
+	return OK;
 
 fail:
 	fclose(fd);
@@ -119,7 +126,8 @@ int load_map(const char *name, enum map type, const char *filename) {
 	int ret = OK;
 	brain_t brain;
 
-	if (name == NULL || filename == NULL) return -EINVAL;
+	WARN_IF(name == NULL);
+	WARN_IF(filename == NULL);
 
 	fd = fopen(filename, "r");
 	if (fd == NULL) return -EIO;
@@ -161,11 +169,13 @@ fail:
 int iter_map_item(void *data, word_t key_ref, word_t value_ref, const char *key, const char *value) {
 	FILE *fd = data;
 	int ret;
-	(void)key_ref;
-	(void)value_ref;
 
-	if (key == NULL || key[0] == 0) return -EFAULT;
-	if (value == NULL || value[0] == 0) return -EFAULT;
+	BUG_IF(key == NULL);
+	BUG_IF(key[0] == 0);
+	BUG_IF(key_ref == 0);
+	BUG_IF(value == NULL);
+	BUG_IF(value[0] == 0);
+	BUG_IF(value_ref == 0);
 
 	ret = fprintf(fd, "%s\t%s\n", key, value);
 	if (ret <= 0) return -EIO;
@@ -178,7 +188,8 @@ int save_map(const char *name, enum map type, const char *filename) {
 	int ret = OK;
 	brain_t brain;
 
-	if (name == NULL || filename == NULL) return -EINVAL;
+	WARN_IF(name == NULL);
+	WARN_IF(filename == NULL);
 
 	fd = fopen(filename, "w");
 	if (fd == NULL) return -EIO;
@@ -192,8 +203,8 @@ int save_map(const char *name, enum map type, const char *filename) {
 		break;
 		break;
 	default:
-		ret = -EFAULT;
-		goto fail;
+		fclose(fd);
+		BUG();
 	}
 
 	if (ret <= 0) {
@@ -206,6 +217,10 @@ int save_map(const char *name, enum map type, const char *filename) {
 
 	ret = db_map_iter(brain, type, iter_map_item, fd);
 	if (ret) goto fail;
+
+	if (fclose(fd) != 0)
+		return -EIO;
+	return OK;
 
 fail:
 	fclose(fd);
@@ -230,10 +245,9 @@ int dict_add(dict_t *dict, word_t word, uint32_t *pos) {
 	void *mem;
 	int ret;
 
-	if (dict == NULL) return -EINVAL;
+	WARN_IF(dict == NULL);
+	WARN_IF(word == 0);
 	if (pos == NULL) pos = &tmp;
-	if (word == 0)
-		return -EINVAL;
 
 	ret = dict_find(dict, word, pos);
 	if (ret != -ENOTFOUND) return ret;
@@ -243,8 +257,7 @@ int dict_add(dict_t *dict, word_t word, uint32_t *pos) {
 
 	dict->size++;
 
-	if (dict->size <= 0)
-		return -EFAULT;
+	BUG_IF(dict->size <= 0);
 
 	mem = realloc(dict->words, sizeof(word_t) * dict->size);
 	if (mem == NULL) return -ENOMEM;
@@ -263,10 +276,9 @@ int dict_del(dict_t *dict, word_t word, uint32_t *pos) {
 	void *mem;
 	int ret;
 
-	if (dict == NULL) return -EINVAL;
+	WARN_IF(dict == NULL);
+	WARN_IF(word == 0);
 	if (pos == NULL) pos = &tmp;
-	if (word == 0)
-		return -EINVAL;
 
 	ret = dict_find(dict, word, pos);
 	if (ret != OK) return ret;
@@ -284,7 +296,8 @@ int dict_del(dict_t *dict, word_t word, uint32_t *pos) {
 }
 
 int dict_size(dict_t *dict, uint32_t *size) {
-	if (dict == NULL || size == NULL) return -EINVAL;
+	WARN_IF(dict == NULL);
+	WARN_IF(size == NULL);
 	*size = dict->size;
 	return OK;
 }
@@ -295,9 +308,8 @@ int dict_find(dict_t *dict, word_t word, uint32_t *pos) {
 	uint_fast32_t max;
 	int ret;
 
-	if (dict == NULL) return -EINVAL;
-	if (word == 0)
-		return -EINVAL;
+	WARN_IF(dict == NULL);
+	WARN_IF(word == 0);
 
 	max = dict->size - 1;
 
@@ -355,17 +367,15 @@ list_t *list_alloc(void) {
 int list_append(list_t *list, word_t word) {
 	void *mem;
 
-	if (list == NULL) return -EINVAL;
-	if (word == 0)
-		return -EINVAL;
+	WARN_IF(list == NULL);
+	WARN_IF(word == 0);
 
 	if (list->size >= UINT32_MAX)
 		return -ENOSPC;
 
 	list->size++;
 
-	if (list->size <= 0)
-		return -EFAULT;
+	BUG_IF(list->size <= 0);
 
 	mem = realloc(list->words, sizeof(word_t) * list->size);
 	if (mem == NULL) return -ENOMEM;
@@ -376,21 +386,24 @@ int list_append(list_t *list, word_t word) {
 }
 
 int list_get(list_t *list, uint32_t pos, word_t *word) {
-	if (list == NULL || word == NULL) return -EINVAL;
+	WARN_IF(list == NULL);
+	WARN_IF(word == NULL);
 	if (pos >= list->size) return -ENOTFOUND;
 	*word = list->words[pos];
 	return OK;
 }
 
 int list_set(list_t *list, uint32_t pos, word_t word) {
-	if (list == NULL || word == 0) return -EINVAL;
+	WARN_IF(list == NULL);
+	WARN_IF(word == 0);
 	if (pos >= list->size) return -ENOTFOUND;
 	list->words[pos] = word;
 	return OK;
 }
 
 int list_size(list_t *list, uint32_t *size) {
-	if (list == NULL || size == NULL) return -EINVAL;
+	WARN_IF(list == NULL);
+	WARN_IF(size == NULL);
 	*size = list->size;
 	return OK;
 }

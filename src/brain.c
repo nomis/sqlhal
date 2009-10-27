@@ -16,7 +16,7 @@ int input_list(const char *name, const char *prefix, const char *suffix, enum li
 
 	filename = malloc((strlen(prefix) + 1 + strlen(suffix) + 1) * sizeof(char));
 	if (filename == NULL) return -ENOMEM;
-	if (sprintf(filename, "%s.%s", prefix, suffix) <= 0) return -EFAULT;
+	BUG_IF(sprintf(filename, "%s.%s", prefix, suffix) <= 0);
 
 	ret = load_list(name, type, filename);
 	return ret;
@@ -28,7 +28,7 @@ int output_list(const char *name, const char *prefix, const char *suffix, enum l
 
 	filename = malloc((strlen(prefix) + 1 + strlen(suffix) + 1) * sizeof(char));
 	if (filename == NULL) return -ENOMEM;
-	if (sprintf(filename, "%s.%s", prefix, suffix) <= 0) return -EFAULT;
+	BUG_IF(sprintf(filename, "%s.%s", prefix, suffix) <= 0);
 
 	ret = save_list(name, type, filename);
 	return ret;
@@ -40,7 +40,7 @@ int input_map(const char *name, const char *prefix, const char *suffix, enum map
 
 	filename = malloc((strlen(prefix) + 1 + strlen(suffix) + 1) * sizeof(char));
 	if (filename == NULL) return -ENOMEM;
-	if (sprintf(filename, "%s.%s", prefix, suffix) <= 0) return -EFAULT;
+	BUG_IF(sprintf(filename, "%s.%s", prefix, suffix) <= 0);
 
 	ret = load_map(name, type, filename);
 	return ret;
@@ -52,7 +52,7 @@ int output_map(const char *name, const char *prefix, const char *suffix, enum ma
 
 	filename = malloc((strlen(prefix) + 1 + strlen(suffix) + 1) * sizeof(char));
 	if (filename == NULL) return -ENOMEM;
-	if (sprintf(filename, "%s.%s", prefix, suffix) <= 0) return -EFAULT;
+	BUG_IF(sprintf(filename, "%s.%s", prefix, suffix) <= 0);
 
 	ret = save_map(name, type, filename);
 	return ret;
@@ -64,7 +64,7 @@ int input_brain(const char *name, const char *prefix) {
 
 	filename = malloc((strlen(prefix) + 1 + 3 + 1) * sizeof(char));
 	if (filename == NULL) return -ENOMEM;
-	if (sprintf(filename, "%s.brn", prefix) <= 0) return -EFAULT;
+	BUG_IF(sprintf(filename, "%s.brn", prefix) <= 0);
 
 	ret = load_brain(name, filename);
 	return ret;
@@ -76,7 +76,7 @@ int output_brain(const char *name, const char *prefix) {
 
 	filename = malloc((strlen(prefix) + 1 + 3 + 1) * sizeof(char));
 	if (filename == NULL) return -ENOMEM;
-	if (sprintf(filename, "%s.brn", prefix) <= 0) return -EFAULT;
+	BUG_IF(sprintf(filename, "%s.brn", prefix) <= 0);
 
 	ret = save_brain(name, filename);
 	return ret;

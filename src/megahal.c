@@ -22,7 +22,7 @@ int megahal_reply(brain_t brain, list_t *words, char **output) {
 	(void)words;
 	(void)output;
 
-	return -EFAULT;
+	BUG(); // TODO
 }
 
 int megahal_process(brain_t brain, const char *input, char **output, uint8_t flags) {
@@ -46,7 +46,7 @@ int megahal_process(brain_t brain, const char *input, char **output, uint8_t fla
 	}
 
 	if ((flags & MEGAHAL_F_LEARN) != 0) {
-		if (words == NULL) return -EINVAL;
+		WARN_IF(words == NULL);
 
 		ret = megahal_learn(brain, words);
 		list_free(&words);
@@ -54,7 +54,7 @@ int megahal_process(brain_t brain, const char *input, char **output, uint8_t fla
 	}
 
 	if (output != NULL) {
-		if (words == NULL) return -EFAULT; // TODO
+		if (words == NULL) BUG(); // TODO
 
 		ret = megahal_reply(brain, words, output);
 		list_free(&words);
@@ -71,7 +71,7 @@ int megahal_train(brain_t brain, const char *filename) {
 	char *string;
 	int ret = OK;
 
-	if (filename == NULL) return -EINVAL;
+	WARN_IF(filename == NULL);
 
 	fd = fopen(filename, "r");
 	if (fd == NULL) return -EIO;

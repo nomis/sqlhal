@@ -17,7 +17,8 @@ int db_model_get_order(brain_t brain, number_t *order) {
 	const char *param[1];
 	char tmp[1][32];
 
-	if (brain == 0 || order == NULL) return -EINVAL;
+	WARN_IF(brain == 0);
+	WARN_IF(order == NULL);
 	if (db_connect())
 		return -EDB;
 
@@ -50,7 +51,8 @@ int db_model_set_order(brain_t brain, number_t order) {
 	number_t current;
 	int ret;
 
-	if (brain == 0 || order == 0) return -EINVAL;
+	WARN_IF(brain == 0);
+	WARN_IF(order == 0);
 	if (db_connect())
 		return -EDB;
 
@@ -83,7 +85,7 @@ int db_model_zap(brain_t brain) {
 	const char *param[1];
 	char tmp[1][32];
 
-	if (brain == 0) return -EINVAL;
+	WARN_IF(brain == 0);
 	if (db_connect())
 		return -EDB;
 
@@ -140,9 +142,10 @@ int db_model_node_fill(brain_t brain, db_tree *node) {
 	unsigned int num, pos, i;
 	const char *param[2];
 	char tmp[2][32];
-	int parent;
+	int found;
 
-	if (brain == 0 || node == NULL) return -EINVAL;
+	WARN_IF(brain == 0);
+	WARN_IF(node == NULL);
 	if (db_connect())
 		return -EDB;
 
@@ -175,7 +178,7 @@ int db_model_node_fill(brain_t brain, db_tree *node) {
 		}
 	}
 
-	parent = -EFAULT;
+	found = 0;
 	for (i = 0, pos = 0; i < num; i++) {
 		db_tree *child;
 		node_t id;
@@ -183,7 +186,7 @@ int db_model_node_fill(brain_t brain, db_tree *node) {
 		GET_VALUE(res, i, 0, id);
 
 		if (id == node->id) {
-			parent = OK;
+			found = 1;
 
 			GET_VALUE(res, i, 1, node->word);
 			GET_VALUE(res, i, 2, node->usage);
@@ -211,12 +214,9 @@ int db_model_node_fill(brain_t brain, db_tree *node) {
 			pos++;
 		}
 	}
-
 	PQclear(res);
 
-	if (parent)
-		return parent;
-
+	BUG_IF(!found);
 	return OK;
 
 fail:
@@ -239,7 +239,9 @@ int db_model_get_root(brain_t brain, db_tree **forward, db_tree **backward) {
 	int created = 0;
 	int ret;
 
-	if (brain == 0 || forward == NULL || backward == NULL) return -EINVAL;
+	WARN_IF(brain == 0);
+	WARN_IF(forward == NULL);
+	WARN_IF(backward == NULL);
 	if (db_connect())
 		return -EDB;
 
@@ -312,7 +314,8 @@ int db_model_create(brain_t brain, db_tree **node) {
 	char tmp[1][32];
 	db_tree *node_p;
 
-	if (brain == 0 || node == NULL) return -EINVAL;
+	WARN_IF(brain == 0);
+	WARN_IF(node == NULL);
 	if (db_connect())
 		return -EDB;
 
@@ -348,7 +351,8 @@ int db_model_update(brain_t brain, db_tree *node) {
 	const char *param[5];
 	char tmp[5][32];
 
-	if (brain == 0 || node == NULL) return -EINVAL;
+	WARN_IF(brain == 0);
+	WARN_IF(node == NULL);
 	if (db_connect())
 		return -EDB;
 
@@ -399,10 +403,11 @@ fail:
 }
 
 int db_model_link(db_tree *parent, db_tree *child) {
-	if (parent == NULL || child == NULL) return -EINVAL;
-	if (parent->id == 0) return -EINVAL;
-	if (child->parent_id != 0) return -EINVAL;
-	if (parent->parent_id != 0 && parent->word == 0) return -EINVAL;
+	BUG_IF(parent == NULL);
+	BUG_IF(child == NULL);
+	BUG_IF(parent->id == 0);
+	BUG_IF(child->parent_id != 0);
+	BUG_IF(parent->parent_id != 0 && parent->word == 0);
 
 	child->parent_id = parent->id;
 	return OK;
@@ -416,8 +421,14 @@ int db_model_dump_words(brain_t brain, uint_fast32_t *dict_size, word_t **dict_w
 	const char *param[1];
 	char tmp[1][32];
 
-	if (brain == 0 || dict_size == NULL || dict_words == NULL || dict_idx == NULL || dict_text == NULL) return -EINVAL;
-	if (*dict_words == NULL || *dict_idx == NULL || *dict_text == NULL) return -EINVAL;
+	WARN_IF(brain == 0);
+	WARN_IF(dict_size == NULL);
+	WARN_IF(dict_words == NULL);
+	WARN_IF(dict_idx == NULL);
+	WARN_IF(dict_text == NULL);
+	WARN_IF(*dict_words == NULL);
+	WARN_IF(*dict_idx == NULL);
+	WARN_IF(*dict_text == NULL);
 	if (db_connect())
 		return -EDB;
 

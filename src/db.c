@@ -17,7 +17,8 @@ int db_brain_use(const char *brain, brain_t *ref) {
 int db_word_use(const char *word, word_t *ref) {
 	int ret;
 
-	if (word == NULL || word[0] == 0) return -EINVAL;
+	WARN_IF(word == NULL);
+	WARN_IF(word[0] == 0);
 
 	ret = db_word_get(word, ref);
 	if (ret == -ENOTFOUND)
