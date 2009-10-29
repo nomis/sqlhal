@@ -260,7 +260,7 @@ int dict_add(dict_t *dict, word_t word, uint32_t *pos) {
 	BUG_IF(dict->size <= 0);
 
 	mem = realloc(dict->words, sizeof(word_t) * dict->size);
-	if (mem == NULL) return -ENOMEM;
+	if (mem == NULL) { dict->size--; return -ENOMEM; }
 	dict->words = mem;
 
 	for (i = *pos + 1; i < dict->size; i++)
@@ -378,10 +378,35 @@ int list_append(list_t *list, word_t word) {
 	BUG_IF(list->size <= 0);
 
 	mem = realloc(list->words, sizeof(word_t) * list->size);
-	if (mem == NULL) return -ENOMEM;
+	if (mem == NULL) { list->size--; return -ENOMEM; }
 	list->words = mem;
 
 	list->words[list->size - 1] = word;
+	return OK;
+}
+
+int list_prepend(list_t *list, word_t word) {
+	uint_fast32_t i;	
+	void *mem;
+
+	WARN_IF(list == NULL);
+	WARN_IF(word == 0);
+
+	if (list->size >= UINT32_MAX)
+		return -ENOSPC;
+
+	list->size++;
+
+	BUG_IF(list->size <= 0);
+
+	mem = realloc(list->words, sizeof(word_t) * list->size);
+	if (mem == NULL) { list->size--; return -ENOMEM; }
+	list->words = mem;
+
+	for (i = 1; i < list->size; i++)
+		list->words[i] = list->words[i - 1];
+
+	list->words[0] = word;
 	return OK;
 }
 

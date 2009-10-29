@@ -13,6 +13,7 @@ void dict_free(dict_t **dict);
 
 list_t *list_alloc(void);
 int list_append(list_t *list, word_t word);
+int list_prepend(list_t *list, word_t word);
 int list_get(list_t *list, uint32_t pos, word_t *word);
 int list_set(list_t *list, uint32_t pos, word_t word);
 int list_size(list_t *list, uint32_t *size);
