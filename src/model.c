@@ -248,7 +248,7 @@ int save_tree(FILE *fd, uint_fast32_t dict_size, word_t *dict_words, uint32_t *d
 
 	tree_p = *tree;
 
-	ret = db_model_node_fill(brain, (db_tree *)tree_p->nodes[i]);
+	ret = db_model_node_fill(brain, tree_p);
 	if (ret) return ret;
 
 	if (tree_p->word == 0) {
