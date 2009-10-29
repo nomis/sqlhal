@@ -709,6 +709,84 @@ fail:
 	return ret;
 }
 
+int model_init(model_t *model, enum model_dir dir) {
+	uint_fast32_t i;
+	db_tree *tmp;
+	int ret;
+
+	BUG_IF(model == NULL);
+
+	for (i = 0; i < model->order + 2; i++)
+		db_model_node_free(&model->contexts[i]);
+
+	switch (dir) {
+	case MODEL_FORWARD:
+		ret = db_model_get_root(model->brain, &model->contexts[0], &tmp);
+		if (ret) return ret;
+		break;
+
+	case MODEL_BACKWARD:
+		ret = db_model_get_root(model->brain, &tmp, &model->contexts[0]);
+		if (ret) return ret;
+		break;
+
+	default:
+		BUG();
+	}
+	db_model_node_free(&tmp);
+
+	return OK;
+}
+
+int model_update(model_t *model, word_t word, int persist) {
+	uint_fast32_t i;
+	int ret;
+
+	BUG_IF(model == NULL);
+
+	for (i = model->order + 1; i > 0; i--)
+		if (model->contexts[i - 1] != NULL) {
+			ret = db_model_node_find(model->brain, model->contexts[i - 1], word, &model->contexts[i]);
+			if (ret == -ENOTFOUND) {
+				db_model_node_free(&model->contexts[i]);
+			} else if (ret != OK) {
+				return ret;
+			}
+
+			if (persist) {
+				if (ret == -ENOTFOUND) {
+					model->contexts[i] = db_model_node_alloc();
+					if (model->contexts[i] == NULL) return -ENOMEM;
+
+					model->contexts[i]->word = word;
+
+					ret = db_model_link(model->contexts[i - 1], model->contexts[i]);
+					if (ret) return ret;
+
+					model->contexts[i]->count = 1;
+
+					ret = db_model_update(model->brain, model->contexts[i]);
+					if (ret) return ret;
+				} else {
+					if (model->contexts[i]->count < (number_t)~0)
+						model->contexts[i]->count++;
+
+					ret = db_model_update(model->brain, model->contexts[i]);
+					if (ret) return ret;
+				}
+
+				if (model->contexts[i - 1]->usage < (number_t)~0) {
+					model->contexts[i - 1]->usage++;
+
+					ret = db_model_update(model->brain, model->contexts[i - 1]);
+					if (ret) return ret;
+				}
+			}
+		}
+
+	return OK;
+}
+
 void model_free(model_t **model) {
 	model_t *model_p;
 	uint_fast32_t i;
