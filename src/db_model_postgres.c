@@ -112,6 +112,7 @@ int db_model_node_fill(brain_t brain, db_tree *node) {
 
 	WARN_IF(brain == 0);
 	WARN_IF(node == NULL);
+	WARN_IF(node->id == 0);
 	if (db_connect())
 		return -EDB;
 
@@ -173,6 +174,7 @@ int db_model_node_fill(brain_t brain, db_tree *node) {
 			child = (db_tree *)node->nodes[pos];
 
 			child->id = id;
+			child->parent_id = node->id;
 			GET_VALUE(res, i, 1, child->word);
 			GET_VALUE(res, i, 2, child->usage);
 			GET_VALUE(res, i, 3, child->count);
