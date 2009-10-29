@@ -198,6 +198,59 @@ not_found:
 	return -ENOTFOUND;
 }
 
+int db_model_node_find(brain_t brain, db_tree *tree, word_t word, db_tree **found) {
+	PGresult *res;
+	const char *param[3];
+	char tmp[3][32];
+	db_tree *found_p;
+
+	WARN_IF(brain == 0);
+	WARN_IF(tree == NULL);
+	WARN_IF(tree->id == 0);
+	WARN_IF(found == NULL);
+	if (db_connect())
+		return -EDB;
+
+	SET_PARAM(param, tmp, 0, brain);
+	SET_PARAM(param, tmp, 1, tree->id);
+	if (word == 0)
+		param[2] = NULL;
+	else
+		SET_PARAM(param, tmp, 2, word);
+
+	res = PQexecPrepared(conn, "model_node_find", 3, param, NULL, NULL, 0);
+	if (PQresultStatus(res) != PGRES_TUPLES_OK) goto fail;
+	if (PQntuples(res) == 0) goto not_found;
+
+	if (*found != NULL)
+		db_model_node_free(found);
+
+	*found = db_model_node_alloc();
+	if (*found == NULL) {
+		PQclear(res);
+		return -ENOMEM;
+	}
+	found_p = *found;
+
+	found_p->parent_id = tree->id;
+	GET_VALUE(res, 0, 0, found_p->id);
+	GET_VALUE(res, 0, 1, found_p->word);
+	GET_VALUE(res, 0, 2, found_p->usage);
+	GET_VALUE(res, 0, 3, found_p->count);
+
+	PQclear(res);
+	return OK;
+
+fail:
+	log_error("db_model_node_find", PQresultStatus(res), PQresultErrorMessage(res));
+	PQclear(res);
+	return -EDB;
+
+not_found:
+	PQclear(res);
+	return -ENOTFOUND;
+}
+
 int db_model_get_root(brain_t brain, db_tree **forward, db_tree **backward) {
 	PGresult *res;
 	const char *param[3];

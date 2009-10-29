@@ -300,6 +300,11 @@ int db_connect(void) {
 			if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
 			PQclear(res);
 
+			res = PQprepare(conn, "model_node_find", "SELECT id, word, usage, count FROM nodes"\
+				" WHERE brain = $1 AND parent = $2 AND word = $3", 3, NULL);
+			if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
+			PQclear(res);
+
 			res = PQprepare(conn, "model_brain_words", "SELECT id, ROW_NUMBER() OVER (ORDER BY id) - 1, word "\
 				" FROM words WHERE id IN (SELECT word FROM nodes WHERE brain=$1) ORDER BY word", 1, NULL);
 			if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
@@ -421,6 +426,9 @@ int db_disconnect(void) {
 	PQclear(res);
 
 	res = PQexec(conn, "DEALLOCATE PREPARE model_node_get");
+	PQclear(res);
+
+	res = PQexec(conn, "DEALLOCATE PREPARE model_node_find");
 	PQclear(res);
 
 	res = PQexec(conn, "DEALLOCATE PREPARE model_brain_words");
