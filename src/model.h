@@ -1,5 +1,10 @@
+enum file_type {
+	FILETYPE_MEGAHAL8,
+	FILETYPE_SQLHAL0
+};
+
 int load_brain(const char *name, const char *filename);
-int save_brain(const char *name, const char *filename);
+int save_brain(const char *name, enum file_type type, const char *filename);
 
 typedef struct {
 	brain_t brain;

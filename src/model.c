@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <endian.h>
 
 #include "err.h"
 #include "types.h"
@@ -9,7 +10,10 @@
 #include "model.h"
 #include "output.h"
 
-#define COOKIE "MegaHALv8"
+#define COOKIE_M8 "MegaHALv8"
+#define COOKIE_S0 "SHAL\x80\x0D\x0A\x1A\x0A"
+#define COOKIE_LEN 9
+
 #define TOKENS 2
 #define TOKEN_ERROR_IDX 0
 #define TOKEN_ERROR "<ERROR>"
@@ -21,43 +25,182 @@ enum load_mode {
 	LOAD_STORE
 };
 
-int load_tree(FILE *fd, enum load_mode mode, uint_fast32_t dict_size, word_t *dict_words, brain_t brain, db_tree *tree) {
-	uint16_t symbol;
-	uint32_t usage;
-	uint16_t count;
-	uint16_t branch;
+enum size_type {
+	SZ_8 = 0,
+	SZ_16 = 1,
+	SZ_32 = 2,
+	SZ_64 = 3
+};
+
+typedef struct {
+	brain_t brain;
+	number_t order;
+
+	FILE *fd;
+	enum file_type type;
+	enum load_mode mode;
+
+	uint_fast32_t dict_size;
+	word_t *dict_words;
+} load_t;
+
+typedef struct {
+	brain_t brain;
+	number_t order;
+
+	FILE *fd;
+	enum file_type type;
+
+	uint_fast32_t dict_size;
+	word_t *dict_words;
+	uint32_t *dict_idx;
+	char **dict_text;
+} save_t;
+
+static inline enum size_type data_size(uint64_t data) {
+	if (data < UINT8_MAX) return SZ_8;
+	else if (data < UINT16_MAX) return SZ_16;
+	else if (data < UINT32_MAX) return SZ_32;
+	else return SZ_64;
+}
+
+static inline int write_data(save_t *data, enum size_type size, uint64_t value) {
+	switch (size) {
+	case SZ_8: {
+			uint8_t tmp = value;
+			if (!fwrite(&tmp, sizeof(tmp), 1, data->fd)) return -EIO;
+		}
+		break;
+
+	case SZ_16: {
+			uint16_t tmp;
+			if (data->type == FILETYPE_MEGAHAL8) tmp = value;
+			else tmp = htobe16(value);
+			if (!fwrite(&tmp, sizeof(tmp), 1, data->fd)) return -EIO;
+		}
+		break;
+
+	case SZ_32: {
+			uint32_t tmp;
+			if (data->type == FILETYPE_MEGAHAL8) tmp = value;
+			else tmp = htobe32(value);
+			if (!fwrite(&tmp, sizeof(tmp), 1, data->fd)) return -EIO;
+		}
+		break;
+
+	case SZ_64: {
+			uint64_t tmp;
+			if (data->type == FILETYPE_MEGAHAL8) tmp = value;
+			else tmp = htobe64(value);
+			if (!fwrite(&tmp, sizeof(tmp), 1, data->fd)) return -EIO;
+		}
+		break;
+
+	default:
+		BUG();
+	}
+
+	return OK;
+}
+
+static inline int read_data(load_t *data, enum size_type size, uint64_t *value) {
+	switch (size) {
+	case SZ_8: {
+			uint8_t tmp;
+			if (!fread(&tmp, sizeof(tmp), 1, data->fd)) return -EIO;
+			*value = tmp;
+		}
+		break;
+
+	case SZ_16: {
+			uint16_t tmp;
+			if (!fread(&tmp, sizeof(tmp), 1, data->fd)) return -EIO;
+			if (data->type == FILETYPE_MEGAHAL8) *value = tmp;
+			else *value = be16toh(tmp);
+		}
+		break;
+
+	case SZ_32: {
+			uint32_t tmp;
+			if (!fread(&tmp, sizeof(tmp), 1, data->fd)) return -EIO;
+			if (data->type == FILETYPE_MEGAHAL8) *value = tmp;
+			else *value = be32toh(tmp);
+		}
+		break;
+
+	case SZ_64: {
+			uint64_t tmp;
+			if (!fread(&tmp, sizeof(tmp), 1, data->fd)) return -EIO;
+			if (data->type == FILETYPE_MEGAHAL8) *value = tmp;
+			else *value = be64toh(tmp);
+		}
+		break;
+
+	default:
+		BUG();
+	}
+
+	return OK;
+}
+
+int load_tree(load_t *data, db_tree *tree) {
+	uint64_t symbol;
+	uint64_t usage;
+	uint64_t count;
+	uint64_t branch;
 	int ret;
+	uint8_t sizes;
 	uint_fast16_t i;
 
-	WARN_IF(fd == NULL);
+	WARN_IF(data == NULL);
 
-	if (!fread(&symbol, sizeof(symbol), 1, fd)) return -EIO;
-	if (!fread(&usage, sizeof(usage), 1, fd)) return -EIO;
-	if (!fread(&count, sizeof(count), 1, fd)) return -EIO;
-	if (!fread(&branch, sizeof(branch), 1, fd)) return -EIO;
+	switch (data->type) {
+	case FILETYPE_MEGAHAL8:
+		sizes = (SZ_16 << 6) | (SZ_32 << 4) | (SZ_16 << 2) | SZ_16;
+		break;
 
-	if (mode == LOAD_STORE) {
-		WARN_IF(dict_words == NULL);
-		WARN_IF(brain == 0);
+	case FILETYPE_SQLHAL0:
+		if (!fread(&sizes, sizeof(sizes), 1, data->fd)) return -EIO;
+		break;
+
+	default:
+		BUG();
+	}
+
+	ret = read_data(data, (sizes >> 6) & 3, &symbol);
+	if (ret) return ret;
+
+	ret = read_data(data, (sizes >> 4) & 3, &usage);
+	if (ret) return ret;
+
+	ret = read_data(data, (sizes >> 2) & 3, &count);
+	if (ret) return ret;
+
+	ret = read_data(data, sizes & 3, &branch);
+	if (ret) return ret;
+
+	if (data->mode == LOAD_STORE) {
+		WARN_IF(data->dict_words == NULL);
+		WARN_IF(data->brain == 0);
 		WARN_IF(tree == NULL);
 
-		if (symbol >= dict_size) {
+		if (symbol >= data->dict_size) {
 			log_error("load_tree", symbol, "Symbol references beyond end of dictionary");
 			WARN();
 		}
 
-		tree->word = dict_words[symbol];
+		tree->word = data->dict_words[symbol];
 		tree->usage = usage;
 		tree->count = count;
 
-		ret = db_model_update(brain, tree);
+		ret = db_model_update(data->brain, tree);
 		if (ret) return ret;
 	}
 
 	for (i = 0; i < branch; i++) {
 		db_tree *node = NULL;
 
-		if (mode == LOAD_STORE) {
+		if (data->mode == LOAD_STORE) {
 			node = db_model_node_alloc();
 			if (node == NULL) return -ENOMEM;
 
@@ -65,10 +208,10 @@ int load_tree(FILE *fd, enum load_mode mode, uint_fast32_t dict_size, word_t *di
 			if (ret) return ret;
 		}
 
-		ret = load_tree(fd, mode, dict_size, dict_words, brain, node);
+		ret = load_tree(data, node);
 		if (ret) return ret;
 
-		if (mode == LOAD_STORE) {
+		if (data->mode == LOAD_STORE) {
 			db_model_node_free(&node);
 		}
 	}
@@ -76,25 +219,43 @@ int load_tree(FILE *fd, enum load_mode mode, uint_fast32_t dict_size, word_t *di
 	return OK;
 }
 
-int load_dict(FILE *fd, uint_fast32_t *dict_size, word_t **dict_words) {
-	uint32_t size;
+int load_dict(load_t *data) {
+	uint64_t size;
 	uint8_t length;
 	int ret;
 	word_t word;
 	char tmp[256];
 	uint_fast32_t i;
 
-	if (!fread(&size, sizeof(size), 1, fd)) return -EIO;
+	switch (data->type) {
+	case FILETYPE_MEGAHAL8:
+		ret = read_data(data, SZ_32, &size);
+		if (ret) return ret;
+		break;
 
-	*dict_size = size;
-	*dict_words = malloc(sizeof(word_t) * size);
-	if (*dict_words == NULL) return -ENOMEM;
+	case FILETYPE_SQLHAL0:
+		ret = read_data(data, SZ_64, &size);
+		if (ret) return ret;
+		break;
 
-	for (i = 0; i < *dict_size; i++) {
-		if (!fread(&length, sizeof(length), 1, fd)) return -EIO;
+	default:
+		BUG();
+	}
+
+	if (size > UINT32_MAX) {
+		log_error("load_dict", i, "Cannot handle brains with more than 2^32-1 words");
+		WARN();
+	}
+
+	data->dict_size = size;
+	data->dict_words = malloc(sizeof(word_t) * size);
+	if (data->dict_words == NULL) return -ENOMEM;
+
+	for (i = 0; i < data->dict_size; i++) {
+		if (!fread(&length, sizeof(length), 1, data->fd)) return -EIO;
 
 		tmp[length] = 0;
-		if (fread(tmp, sizeof(char), length, fd) != length) return -EIO;
+		if (fread(tmp, sizeof(char), length, data->fd) != length) return -EIO;
 
 		switch (i) {
 		case TOKEN_ERROR_IDX:
@@ -102,7 +263,7 @@ int load_dict(FILE *fd, uint_fast32_t *dict_size, word_t **dict_words) {
 				log_error("load_dict", i, "Invalid word (not " TOKEN_ERROR ")");
 				WARN();
 			}
-			(*dict_words)[i] = 0;
+			(data->dict_words)[i] = 0;
 			break;
 
 		case TOKEN_FIN_IDX:
@@ -110,109 +271,121 @@ int load_dict(FILE *fd, uint_fast32_t *dict_size, word_t **dict_words) {
 				log_error("load_dict", i, "Invalid word (not " TOKEN_FIN ")");
 				WARN();
 			}
-			(*dict_words)[i] = 0;
+			(data->dict_words)[i] = 0;
 			break;
 
 		default:
 			ret = db_word_use(tmp, &word);
 			if (ret) return ret;
 
-			(*dict_words)[i] = word;
+			(data->dict_words)[i] = word;
 		}
 	}
 
 	return OK;
 }
 
-void free_loaded_dict(uint_fast32_t *dict_size, word_t **dict_words) {
-	free(*dict_words);
+void free_loaded_dict(load_t *data) {
+	free(data->dict_words);
 
-	*dict_size = 0;
-	*dict_words = NULL;
+	data->dict_size = 0;
+	data->dict_words = NULL;
 }
 
-void free_saved_dict(uint_fast32_t *dict_size, word_t **dict_words, uint32_t **dict_idx, char ***dict_text) {
+void free_saved_dict(save_t *data) {
 	uint_fast32_t i;
 
-	for (i = TOKENS; i < *dict_size; i++)
-		free((*dict_text)[i]);
+	for (i = TOKENS; i < data->dict_size; i++)
+		free((data->dict_text)[i]);
 
-	free(*dict_words);
-	free(*dict_idx);
-	free(*dict_text);
+	free(data->dict_words);
+	free(data->dict_idx);
+	free(data->dict_text);
 
-	*dict_size = 0;
-	*dict_words = NULL;
-	*dict_idx = NULL;
-	*dict_text = NULL;
+	data->dict_size = 0;
+	data->dict_words = NULL;
+	data->dict_idx = NULL;
+	data->dict_text = NULL;
 }
 
-int read_dict(brain_t brain, uint_fast32_t *dict_size, word_t **dict_words, uint32_t **dict_idx, char ***dict_text) {
+int read_dict(save_t *data) {
 	int ret;
 
-	*dict_size = 0;
+	data->dict_size = 0;
 
-	*dict_words = malloc(sizeof(word_t) * TOKENS);
-	if (*dict_words == NULL) return -ENOMEM;
+	data->dict_words = malloc(sizeof(word_t) * TOKENS);
+	if (data->dict_words == NULL) return -ENOMEM;
 
-	*dict_idx = malloc(sizeof(uint32_t) * TOKENS);
-	if (*dict_idx == NULL) return -ENOMEM;
+	data->dict_idx = malloc(sizeof(uint32_t) * TOKENS);
+	if (data->dict_idx == NULL) return -ENOMEM;
 
-	*dict_text = malloc(sizeof(char *) * TOKENS);
-	if (*dict_text == NULL) return -ENOMEM;
+	data->dict_text = malloc(sizeof(char *) * TOKENS);
+	if (data->dict_text == NULL) return -ENOMEM;
 
-	(*dict_words)[TOKEN_ERROR_IDX] = 0;
-	(*dict_idx)[TOKEN_ERROR_IDX] = TOKEN_ERROR_IDX;
-	(*dict_text)[TOKEN_ERROR_IDX] = TOKEN_ERROR;
+	(data->dict_words)[TOKEN_ERROR_IDX] = 0;
+	(data->dict_idx)[TOKEN_ERROR_IDX] = TOKEN_ERROR_IDX;
+	(data->dict_text)[TOKEN_ERROR_IDX] = TOKEN_ERROR;
 
-	(*dict_words)[TOKEN_FIN_IDX] = 0;
-	(*dict_idx)[TOKEN_FIN_IDX] = TOKEN_FIN_IDX;
-	(*dict_text)[TOKEN_FIN_IDX] = TOKEN_FIN;
+	(data->dict_words)[TOKEN_FIN_IDX] = 0;
+	(data->dict_idx)[TOKEN_FIN_IDX] = TOKEN_FIN_IDX;
+	(data->dict_text)[TOKEN_FIN_IDX] = TOKEN_FIN;
 
-	*dict_size = TOKENS;
+	data->dict_size = TOKENS;
 
-	ret = db_model_dump_words(brain, dict_size, dict_words, dict_idx, dict_text);
+	ret = db_model_dump_words(data->brain, &data->dict_size, &data->dict_words, &data->dict_idx, &data->dict_text);
 	if (ret) {
-		free_saved_dict(dict_size, dict_words, dict_idx, dict_text);
+		free_saved_dict(data);
 		return ret;
 	}
 
 	return OK;
 }
 
-int save_dict(FILE *fd, uint_fast32_t dict_size, char **dict_text) {
+int save_dict(save_t *data) {
+	int ret;
 	uint8_t length;
-	uint32_t _dict_size;
 	uint_fast32_t i;
 
-	_dict_size = dict_size;
-	if (!fwrite(&_dict_size, sizeof(_dict_size), 1, fd)) return -EIO;
+	switch (data->type) {
+	case FILETYPE_MEGAHAL8:
+		ret = write_data(data, SZ_32, data->dict_size);
+		if (ret) return ret;
+		break;
 
-	for (i = 0; i < dict_size; i++) {
-		length = strlen(dict_text[i]);
-		if (!fwrite(&length, sizeof(length), 1, fd)) return -EIO;
-		if (fwrite(dict_text[i], sizeof(char), length, fd) != length) return -EIO;
+	case FILETYPE_SQLHAL0:
+		ret = write_data(data, SZ_64, data->dict_size);
+		if (ret) return ret;
+		break;
+
+	default:
+		break;
+	}
+
+	for (i = 0; i < data->dict_size; i++) {
+		length = strlen(data->dict_text[i]);
+		if (!fwrite(&length, sizeof(length), 1, data->fd)) return -EIO;
+		if (fwrite(data->dict_text[i], sizeof(char), length, data->fd) != length) return -EIO;
 	}
 
 	return OK;
 }
 
-int find_word(uint_fast32_t dict_size, word_t *dict_words, uint32_t *dict_idx, word_t word, uint16_t *symbol) {
+int find_word(save_t *data, word_t word, uint32_t *symbol) {
 	uint_fast32_t min = 0;
 	uint_fast32_t pos;
-	uint_fast32_t max = dict_size - 1;
+	uint_fast32_t max = data->dict_size - 1;
 
 	WARN_IF(word == 0);
 
 	while (1) {
 		pos = (min + max) / 2;
 
-		if (word == dict_words[pos]) {
+		if (word == data->dict_words[pos]) {
 			BUG_IF(pos == TOKEN_ERROR_IDX);
 			BUG_IF(pos == TOKEN_FIN_IDX);
-			*symbol = dict_idx[pos];
+			*symbol = data->dict_idx[pos];
 			return OK;
-		} else if (word > dict_words[pos]) {
+		} else if (word > data->dict_words[pos]) {
 			if (max == pos) {
 				log_error("find_word", word, "Word missing from dictionary");
 				return -ENOTFOUND;
@@ -228,57 +401,90 @@ int find_word(uint_fast32_t dict_size, word_t *dict_words, uint32_t *dict_idx, w
 	}
 }
 
-int save_tree(FILE *fd, uint_fast32_t dict_size, word_t *dict_words, uint32_t *dict_idx, brain_t brain, db_tree **tree) {
+int save_tree(save_t *data, db_tree **tree) {
 	db_tree *tree_p;
-	uint16_t symbol;
-	uint32_t usage;
-	uint16_t count;
-	uint16_t branch;
 	int ret;
+	uint32_t word;
 	uint_fast32_t i;
 
-	WARN_IF(fd == NULL);
-	WARN_IF(dict_words == NULL);
-	WARN_IF(brain == 0);
+	WARN_IF(data == NULL);
+	WARN_IF(data->brain == 0);
 	WARN_IF(tree == NULL);
 	WARN_IF(*tree == NULL);
 
-	if (dict_size > UINT16_MAX)
+	if (data->dict_size > UINT16_MAX)
 		return -ENOSPC;
 
 	tree_p = *tree;
 
-	ret = db_model_node_fill(brain, tree_p);
+	ret = db_model_node_fill(data->brain, tree_p);
 	if (ret) return ret;
 
 	if (tree_p->word == 0) {
 		if (tree_p->parent_id == 0) {
-			symbol = TOKEN_ERROR_IDX;
+			word = TOKEN_ERROR_IDX;
 		} else {
 			BUG_IF(tree_p->usage != 0);
 			BUG_IF(tree_p->children != 0);
 
-			symbol = TOKEN_FIN_IDX;
+			word = TOKEN_FIN_IDX;
 		}
 	} else {
-		ret = find_word(dict_size, dict_words, dict_idx, tree_p->word, &symbol);
+		ret = find_word(data, tree_p->word, &word);
 		if (ret) return ret;
 	}
 
-	usage = tree_p->usage > UINT32_MAX ? UINT32_MAX : tree_p->usage;
-	count = tree_p->count > UINT16_MAX ? UINT16_MAX : tree_p->count;
+	switch (data->type) {
+	case FILETYPE_MEGAHAL8: {
+			uint16_t symbol;
+			uint32_t usage;
+			uint16_t count;
+			uint16_t branch;
 
-	if (tree_p->children > UINT16_MAX)
-		return -ENOSPC;
-	branch = tree_p->children;
+			BUG_IF(word > UINT16_MAX);
+			symbol = word;
+			usage = tree_p->usage > UINT32_MAX ? UINT32_MAX : tree_p->usage;
+			count = tree_p->count > UINT16_MAX ? UINT16_MAX : tree_p->count;
 
-	if (!fwrite(&symbol, sizeof(symbol), 1, fd)) return -EIO;
-	if (!fwrite(&usage, sizeof(usage), 1, fd)) return -EIO;
-	if (!fwrite(&count, sizeof(count), 1, fd)) return -EIO;
-	if (!fwrite(&branch, sizeof(branch), 1, fd)) return -EIO;
+			if (tree_p->children > UINT16_MAX)
+				return -ENOSPC;
+			branch = tree_p->children;
+
+			if (!fwrite(&symbol, sizeof(symbol), 1, data->fd)) return -EIO;
+			if (!fwrite(&usage, sizeof(usage), 1, data->fd)) return -EIO;
+			if (!fwrite(&count, sizeof(count), 1, data->fd)) return -EIO;
+			if (!fwrite(&branch, sizeof(branch), 1, data->fd)) return -EIO;
+		}
+		break;
+
+	case FILETYPE_SQLHAL0: {
+			uint8_t sizes = (data_size(word) << 6)
+				| (data_size(tree_p->usage) << 4)
+				| (data_size(tree_p->count) << 2)
+				| data_size(tree_p->children);
+
+			if (!fwrite(&sizes, sizeof(sizes), 1, data->fd)) return -EIO;
+
+			ret = write_data(data, data_size(word), word);
+			if (ret) return ret;
+
+			ret = write_data(data, data_size(tree_p->usage), tree_p->usage);
+			if (ret) return ret;
+
+			ret = write_data(data, data_size(tree_p->count), tree_p->count);
+			if (ret) return ret;
+
+			ret = write_data(data, data_size(tree_p->children), tree_p->children);
+			if (ret) return ret;
+		}
+		break;
+
+	default:
+		BUG();
+	}
 
 	for (i = 0; i < tree_p->children; i++) {
-		ret = save_tree(fd, dict_size, dict_words, dict_idx, brain, (db_tree **)&tree_p->nodes[i]);
+		ret = save_tree(data, (db_tree **)&tree_p->nodes[i]);
 		if (ret) return ret;
 	}
 	db_model_node_free(tree);
@@ -287,14 +493,10 @@ int save_tree(FILE *fd, uint_fast32_t dict_size, word_t *dict_words, uint32_t *d
 }
 
 int load_brain(const char *name, const char *filename) {
-	FILE *fd;
 	int ret = OK;
-	brain_t brain;
-	char cookie[16];
-	number_t order;
+	load_t data;
+	char cookie[COOKIE_LEN];
 	uint8_t tmp8;
-	uint_fast32_t dict_size;
-	word_t *dict_words;
 	db_tree *forward;
 	db_tree *backward;
 
@@ -303,133 +505,177 @@ int load_brain(const char *name, const char *filename) {
 
 	log_info("load_brain", 0, filename);
 
-	fd = fopen(filename, "r");
-	if (fd == NULL) return -EIO;
+	data.fd = fopen(filename, "r");
+	if (data.fd == NULL) return -EIO;
 
-	ret = db_brain_use(name, &brain);
+	ret = db_brain_use(name, &data.brain);
 	if (ret) goto fail;
 
-	ret = db_model_zap(brain);
+	ret = db_model_zap(data.brain);
 	if (ret) goto fail;
 
-	if (fread(cookie, sizeof(char), strlen(COOKIE), fd) != strlen(COOKIE)) return -EIO;
-	if (strncmp(cookie, COOKIE, strlen(COOKIE)) != 0) {
+	if (fread(cookie, sizeof(char), COOKIE_LEN, data.fd) != COOKIE_LEN) return -EIO;
+	if (strncmp(cookie, COOKIE_M8, COOKIE_LEN) == 0) {
+		data.type = FILETYPE_MEGAHAL8;
+	} else if (strncmp(cookie, COOKIE_S0, COOKIE_LEN) == 0) {
+		data.type = FILETYPE_SQLHAL0;
+	} else {
 		log_error("load_brain", 1, "Not a MegaHAL brain");
 		ret = -EIO;
 		goto fail;
 	}
 
-	if (!fread(&tmp8, sizeof(tmp8), 1, fd)) return -EIO;
-	order = tmp8;
+	if (!fread(&tmp8, sizeof(tmp8), 1, data.fd)) return -EIO;
+	data.order = tmp8;
 
-	ret = db_model_set_order(brain, order);
+	ret = db_model_set_order(data.brain, data.order);
 	if (ret) goto fail;
 
-	ret = db_model_get_root(brain, &forward, &backward);
+	ret = db_model_get_root(data.brain, &forward, &backward);
 	if (ret) goto fail;
 
-	/* Bah. The word dictionary is at the end of the file.
-	 * Either the file can be read twice or we can waste a ton of memory caching the tree.
-	 */
-	ret = load_tree(fd, LOAD_IGNORE, 0, NULL, 0, NULL); /* forward */
+	if (data.type == FILETYPE_MEGAHAL8) {
+		/* Bah. The word dictionary is at the end of the file.
+		 * Either the file can be read twice or we can waste a ton of memory caching the tree.
+		 */
+		data.mode = LOAD_IGNORE;
+		ret = load_tree(&data, NULL); /* forward */
+		if (ret) goto fail;
+
+		log_info("load_brain", 0, "Skipped forward tree");
+
+		ret = load_tree(&data, NULL); /* backward */
+		if (ret) goto fail;
+
+		log_info("load_brain", 0, "Skipped backward tree");
+	}
+
+	ret = load_dict(&data);
 	if (ret) goto fail;
 
-	log_info("load_brain", 0, "Skipped forward tree");
+	log_info("load_brain", data.dict_size, "Dictionary loaded");
 
-	ret = load_tree(fd, LOAD_IGNORE, 0, NULL, 0, NULL); /* backward */
-	if (ret) goto fail;
+	data.mode = LOAD_STORE;
 
-	log_info("load_brain", 0, "Skipped backward tree");
+	if (data.type == FILETYPE_MEGAHAL8) {
+		/* Read most of the file again... */
+		if (fseek(data.fd, sizeof(char) * COOKIE_LEN + sizeof(tmp8), SEEK_SET)) return -EIO;
+	}
 
-	ret = load_dict(fd, &dict_size, &dict_words);
-	if (ret) goto fail;
-
-	log_info("load_brain", dict_size, "Dictionary loaded");
-
-	/* Read most of the file again... */
-	if (fseek(fd, sizeof(char) * strlen(COOKIE) + sizeof(tmp8), SEEK_SET)) return -EIO;
-
-	ret = load_tree(fd, LOAD_STORE, dict_size, dict_words, brain, forward);
+	ret = load_tree(&data, forward);
 	if (ret) goto fail;
 
 	db_model_node_free(&forward);
 
 	log_info("load_brain", 0, "Forward tree loaded");
 
-	ret = load_tree(fd, LOAD_STORE, dict_size, dict_words, brain, backward);
+	ret = load_tree(&data, backward);
 	if (ret) goto fail;
 
 	db_model_node_free(&backward);
 
 	log_info("load_brain", 0, "Backward tree loaded");
 
-	free_loaded_dict(&dict_size, &dict_words);
+	free_loaded_dict(&data);
 
 fail:
-	fclose(fd);
+	fclose(data.fd);
 	return ret;
 }
 
-int save_brain(const char *name, const char *filename) {
-	FILE *fd;
+int save_brain(const char *name, enum file_type type, const char *filename) {
 	int ret = OK;
-	brain_t brain;
-	number_t order;
+	save_t data;
+	const char *cookie;
 	uint8_t tmp8;
-	uint_fast32_t dict_size;
-	word_t *dict_words;
-	uint32_t *dict_idx;
-	char **dict_text;
 	db_tree *forward;
 	db_tree *backward;
 
 	WARN_IF(name == NULL);
 	WARN_IF(filename == NULL);
 
+	switch (type) {
+	case FILETYPE_MEGAHAL8:
+		cookie = COOKIE_M8;
+		break;
+
+	case FILETYPE_SQLHAL0:
+		cookie = COOKIE_S0;
+		break;
+
+	default:
+		BUG();
+	}
+
 	log_info("save_brain", 0, filename);
 
-	fd = fopen(filename, "w");
-	if (fd == NULL) return -EIO;
+	data.type = type;
+	data.fd = fopen(filename, "w");
+	if (data.fd == NULL) return -EIO;
 
-	ret = db_brain_get(name, &brain);
+	ret = db_brain_get(name, &data.brain);
 	if (ret) goto fail;
 
-	ret = db_model_get_order(brain, &order);
+	ret = db_model_get_order(data.brain, &data.order);
 	if (ret) goto fail;
 
-	if (order > UINT8_MAX) return -ENOSPC;
-	tmp8 = order;
+	if (data.order > UINT8_MAX) return -ENOSPC;
+	tmp8 = data.order;
 
-	ret = db_model_get_root(brain, &forward, &backward);
+	ret = db_model_get_root(data.brain, &forward, &backward);
 	if (ret) goto fail;
 
-	ret = read_dict(brain, &dict_size, &dict_words, &dict_idx, &dict_text);
+	ret = read_dict(&data);
 	if (ret) goto fail;
 
-	log_info("save_brain", dict_size, "Dictionary read");
+	log_info("save_brain", data.dict_size, "Dictionary read");
 
-	if (fwrite(COOKIE, sizeof(char), strlen(COOKIE), fd) != strlen(COOKIE)) return -EIO;
-	if (!fwrite(&tmp8, sizeof(tmp8), 1, fd)) return -EIO;
+	if (fwrite(cookie, sizeof(char), COOKIE_LEN, data.fd) != COOKIE_LEN) return -EIO;
+	if (!fwrite(&tmp8, sizeof(tmp8), 1, data.fd)) return -EIO;
 
-	ret = save_tree(fd, dict_size, dict_words, dict_idx, brain, &forward); /* forward */
-	if (ret) goto fail;
+	switch (data.type) {
+	case FILETYPE_MEGAHAL8:
+		ret = save_tree(&data, &forward); /* forward */
+		if (ret) goto fail;
 
-	log_info("save_brain", 0, "Forward tree saved");
+		log_info("save_brain", 0, "Forward tree saved");
 
-	ret = save_tree(fd, dict_size, dict_words, dict_idx, brain, &backward); /* backward */
-	if (ret) goto fail;
+		ret = save_tree(&data, &backward); /* backward */
+		if (ret) goto fail;
 
-	log_info("save_brain", 0, "Backward tree saved");
+		log_info("save_brain", 0, "Backward tree saved");
 
-	ret = save_dict(fd, dict_size, dict_text);
-	if (ret) goto fail;
+		ret = save_dict(&data);
+		if (ret) goto fail;
 
-	log_info("save_brain", dict_size, "Dictionary saved");
+		log_info("save_brain", data.dict_size, "Dictionary saved");
+		break;
 
-	free_saved_dict(&dict_size, &dict_words, &dict_idx, &dict_text);
+	case FILETYPE_SQLHAL0:
+		ret = save_dict(&data);
+		if (ret) goto fail;
+
+		log_info("save_brain", data.dict_size, "Dictionary saved");
+
+		ret = save_tree(&data, &forward); /* forward */
+		if (ret) goto fail;
+
+		log_info("save_brain", 0, "Forward tree saved");
+
+		ret = save_tree(&data, &backward); /* backward */
+		if (ret) goto fail;
+
+		log_info("save_brain", 0, "Backward tree saved");
+		break;
+
+	default:
+		BUG();
+	}
+
+	free_saved_dict(&data);
 
 fail:
-	fclose(fd);
+	fclose(data.fd);
 	return ret;
 }
 

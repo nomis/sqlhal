@@ -91,7 +91,7 @@ int input_brain(const char *name, const char *prefix) {
 	return ret;
 }
 
-int output_brain(const char *name, const char *prefix) {
+int output_brain(const char *name, enum file_type type, const char *prefix) {
 	char *filename;
 	int ret;
 
@@ -102,7 +102,7 @@ int output_brain(const char *name, const char *prefix) {
 		BUG();
 	}
 
-	ret = save_brain(name, filename);
+	ret = save_brain(name, type, filename);
 	free(filename);
 	return ret;
 }
@@ -115,10 +115,11 @@ int main(int argc, char *argv[]) {
 	int fail = 0;
 	char *state;
 
-	if (argc != 4 || (strcmp(argv[1], "load") && strcmp(argv[1], "save"))) {
+	if (argc != 4 || (strcmp(argv[1], "load") && strcmp(argv[1], "save") && strcmp(argv[1], "save+"))) {
 		printf("Brain manipulation\n");
-		printf("Usage: %s load <name> <filename prefix>\n", argv[0]);
-		printf("       %s save <name> <filename prefix>\n", argv[0]);
+		printf("Usage: %s load  <name> <filename prefix>\n", argv[0]);
+		printf("       %s save  <name> <filename prefix>\n", argv[0]);
+		printf("       %s save+ <name> <filename prefix>\n", argv[0]);
 		return 1;
 	}
 
@@ -161,7 +162,11 @@ int main(int argc, char *argv[]) {
 		ret = input_brain(name, prefix);
 		if (ret) { log_warn("brain", ret, state); fail = 1; }
 		else log_info("brain", ret, state);
-	} else if (!strcmp(action, "save")) {
+	} else if (!strcmp(action, "save") || !strcmp(action, "save+")) {
+		enum file_type type = FILETYPE_MEGAHAL8;
+		if (!strcmp(action, "save+"))
+			type = FILETYPE_SQLHAL0;
+
 		state = "output_list aux";
 		ret = output_list(name, prefix, "aux", LIST_AUX);
 		if (ret) { log_warn("brain", ret, state); fail = 1; }
@@ -183,7 +188,7 @@ int main(int argc, char *argv[]) {
 		else log_info("brain", ret, state);
 
 		state = "output_brain";
-		ret = output_brain(name, prefix);
+		ret = output_brain(name, type, prefix);
 		if (ret) { log_warn("brain", ret, state); fail = 1; }
 		else log_info("brain", ret, state);
 	} else {
