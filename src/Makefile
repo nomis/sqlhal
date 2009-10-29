@@ -11,7 +11,7 @@ clean:
 	rm -f *.o $(BIN)
 
 DB_OBJS=db.o db_conn_$(DB).o db_brain_$(DB).o db_word_$(DB).o db_list_$(DB).o db_map_$(DB).o db_model_$(DB).o
-MH_OBJS=megahal.o megahal_string.o dict.o
+MH_OBJS=megahal.o megahal_string.o dict.o model.o
 
 BRAIN=brain.o dict.o model.o console.o $(DB_OBJS)
 brain: $(BRAIN)

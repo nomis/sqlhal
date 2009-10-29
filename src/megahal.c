@@ -7,14 +7,86 @@
 #include "err.h"
 #include "db.h"
 #include "dict.h"
+#include "model.h"
 #include "megahal.h"
 #include "output.h"
 
 int megahal_learn(brain_t brain, list_t *words) {
+	uint_fast32_t i;
+	uint32_t size;
+	number_t order;
+	model_t *model;
+	int ret;
 	(void)brain;
-	(void)words;
 
-	return -EFAULT;
+	/* We only learn from inputs which are long enough */
+	ret = db_model_get_order(brain, &order);
+	if (ret) return ret;
+
+	ret = list_size(words, &size);
+	if (ret) return ret;
+
+	if (size <= order) return OK;
+
+	ret = model_alloc(brain, &model);
+	if (ret) return ret;
+
+	/*
+	 * Train the model in the forwards direction. Start by initializing
+	 * the context of the model.
+	 */
+	ret = model_init(model, MODEL_FORWARD);
+	if (ret) return ret;
+
+	for (i = 0; i < size; i++) {
+		word_t word;
+
+		/* Get word symbol. */
+		ret = list_get(words, i, &word);
+		if (ret) goto fail;
+
+		/* Update the forward model. */
+		ret = model_update(model, word, 1);
+		if (ret) goto fail;
+	}
+
+	/*
+	 * Add the sentence-terminating symbol.
+	 */
+	ret = model_update(model, 0, 1);
+	if (ret) goto fail;
+
+	/*
+	 * Train the model in the backwards direction. Start by initializing
+	 * the context of the model.
+	 */
+	ret = model_init(model, MODEL_BACKWARD);
+	if (ret) return ret;
+
+	for (i = 0; i < size; i++) {
+		word_t word;
+
+		/* Get word symbol. */
+		ret = list_get(words, (size - 1) - i, &word);
+		if (ret) goto fail;
+
+		/* Update the backward model. */
+		ret = model_update(model, word, 1);
+		if (ret) goto fail;
+	}
+
+	/*
+	 * Add the sentence-terminating symbol.
+	 */
+	ret = model_update(model, 0, 1);
+	if (ret) goto fail;
+
+	model_free(&model);
+	return OK;
+
+fail:
+	model_free(&model);
+	return ret;
 }
 
 int megahal_reply(brain_t brain, list_t *words, char **output) {
