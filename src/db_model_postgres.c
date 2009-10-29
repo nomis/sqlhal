@@ -456,6 +456,9 @@ int db_model_dump_words(brain_t brain, uint_fast32_t *dict_size, word_t **dict_w
 	base = *dict_size;
 	num = PQntuples(res);
 
+	if ((base + num) > UINT32_MAX || (base + num) < base)
+		return -ENOSPC;
+
 	mem = realloc(*dict_words, sizeof(word_t) * (base + num));
 	if (mem == NULL) { PQclear(res); return -ENOMEM; }
 	*dict_words = mem;
