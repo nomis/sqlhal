@@ -315,6 +315,7 @@ int db_model_update(brain_t brain, db_tree *node) {
 
 	WARN_IF(brain == 0);
 	WARN_IF(node == NULL);
+	WARN_IF(node->parent_id == 0 && node->word != 0);
 	if (db_connect())
 		return -EDB;
 
