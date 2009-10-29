@@ -693,9 +693,9 @@ int model_alloc(brain_t brain, model_t **model) {
 	ret = db_model_get_order(brain, &model_p->order);
 	if (ret) goto fail;
 
-	model_p->contexts = malloc(sizeof(db_tree *) * model_p->order);
+	model_p->contexts = malloc(sizeof(db_tree *) * (model_p->order + 2));
 	if (model_p->contexts == NULL) { ret = -ENOMEM; goto fail; }
-	for (i = 0; i < model_p->order; i++)
+	for (i = 0; i < model_p->order + 2; i++)
 		model_p->contexts[i] = NULL;
 
 	return OK;
@@ -716,8 +716,9 @@ void model_free(model_t **model) {
 	if (*model == NULL) return;
 	model_p = *model;
 
-	for (i = 0; i < model_p->order; i++)
+	for (i = 0; i < model_p->order + 2; i++)
 		db_model_node_free(&model_p->contexts[i]);
+	free(model_p->contexts);
 
 	free(*model);
 	*model = NULL;
