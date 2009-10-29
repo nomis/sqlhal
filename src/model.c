@@ -471,13 +471,7 @@ void model_free(model_t **model) {
 	model_p = *model;
 
 	for (i = 0; i < model_p->order; i++)
-		if (model_p->contexts[i] != NULL
-				&& model_p->contexts[i] != model_p->forward
-				&& model_p->contexts[i] != model_p->backward)
-			db_model_node_free(&model_p->contexts[i]);
-
-	db_model_node_free(&model_p->forward);
-	db_model_node_free(&model_p->backward);
+		db_model_node_free(&model_p->contexts[i]);
 
 	free(*model);
 	*model = NULL;
