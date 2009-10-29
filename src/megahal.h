@@ -7,3 +7,4 @@ int megahal_train(brain_t brain, const char *filename);
 void megahal_capitalise(char *string);
 void megahal_upper(char *string);
 int megahal_parse(const char *string, list_t **words);
+int megahal_output(list_t *words, char **string);

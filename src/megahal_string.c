@@ -165,3 +165,10 @@ int megahal_parse(const char *string, list_t **words) {
 
 	return OK;
 }
+
+int megahal_output(list_t *words, char **string) {
+	(void)words;
+	(void)string;
+
+	BUG(); // TODO
+}

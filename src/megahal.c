@@ -11,7 +11,7 @@
 #include "megahal.h"
 #include "output.h"
 
-int megahal_learn(brain_t brain, list_t *words) {
+int megahal_learn(brain_t brain, list_t *input) {
 	uint_fast32_t i;
 	uint32_t size;
 	number_t order;
@@ -23,7 +23,7 @@ int megahal_learn(brain_t brain, list_t *words) {
 	ret = db_model_get_order(brain, &order);
 	if (ret) return ret;
 
-	ret = list_size(words, &size);
+	ret = list_size(input, &size);
 	if (ret) return ret;
 
 	if (size <= order) return OK;
@@ -42,7 +42,7 @@ int megahal_learn(brain_t brain, list_t *words) {
 		word_t word;
 
 		/* Get word symbol. */
-		ret = list_get(words, i, &word);
+		ret = list_get(input, i, &word);
 		if (ret) goto fail;
 
 		/* Update the forward model. */
@@ -67,7 +67,7 @@ int megahal_learn(brain_t brain, list_t *words) {
 		word_t word;
 
 		/* Get word symbol. */
-		ret = list_get(words, (size - 1) - i, &word);
+		ret = list_get(input, (size - 1) - i, &word);
 		if (ret) goto fail;
 
 		/* Update the backward model. */
@@ -89,16 +89,16 @@ fail:
 	return ret;
 }
 
-int megahal_reply(brain_t brain, list_t *words, char **output) {
+int megahal_reply(brain_t brain, list_t *input, list_t *output) {
 	(void)brain;
-	(void)words;
+	(void)input;
 	(void)output;
 
 	BUG(); // TODO
 }
 
 int megahal_process(brain_t brain, const char *input, char **output, uint8_t flags) {
-	list_t *words;
+	list_t *words_in;
 	int ret;
 
 	printf("megahal_process %ld, %s, %p, %d\n", brain, input, output, flags);
@@ -110,30 +110,50 @@ int megahal_process(brain_t brain, const char *input, char **output, uint8_t fla
 		if (tmp == NULL) return -ENOMEM;
 
 		megahal_upper(tmp);
-		ret = megahal_parse(tmp, &words);
+		ret = megahal_parse(tmp, &words_in);
 		free(tmp);
 		if (ret) return ret;
 	} else {
-		words = NULL;
+		words_in = NULL;
 	}
 
 	if ((flags & MEGAHAL_F_LEARN) != 0) {
-		WARN_IF(words == NULL);
+		WARN_IF(words_in == NULL);
 
-		ret = megahal_learn(brain, words);
-		list_free(&words);
-		if (ret) return ret;
+		ret = megahal_learn(brain, words_in);
+		if (ret) {
+			list_free(&words_in);
+			return ret;
+		}
 	}
 
 	if (output != NULL) {
-		if (words == NULL) BUG(); // TODO
+		list_t *words_out;
 
-		ret = megahal_reply(brain, words, output);
-		list_free(&words);
-		if (ret) return ret;
+		if (words_in == NULL) BUG(); // TODO
+
+		words_out = list_alloc();
+		if (words_out == NULL) {
+			list_free(&words_in);
+			return -ENOMEM;
+		}
+
+		ret = megahal_reply(brain, words_in, words_out);
+		if (ret) {
+			list_free(&words_in);
+			list_free(&words_out);
+			return ret;
+		}
+
+		ret = megahal_output(words_out, output);
+		list_free(&words_out);
+		if (ret) {
+			list_free(&words_in);
+			return ret;
+		}
 	}
 
-	list_free(&words);
+	list_free(&words_in);
 	return OK;
 }
 
