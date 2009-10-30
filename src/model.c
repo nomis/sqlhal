@@ -296,8 +296,10 @@ void free_loaded_dict(load_t *data) {
 void free_saved_dict(save_t *data) {
 	uint_fast32_t i;
 
-	for (i = TOKENS; i < data->dict_size; i++)
-		free((data->dict_text)[i]);
+	if (data->dict_text != NULL) {
+		for (i = TOKENS; i < data->dict_size; i++)
+			free(data->dict_text[i]);
+	}
 
 	free(data->dict_words);
 	free(data->dict_idx);
@@ -309,12 +311,48 @@ void free_saved_dict(save_t *data) {
 	data->dict_text = NULL;
 }
 
+int save_dict(save_t *data) {
+	int ret;
+	uint8_t length;
+	uint_fast32_t i;
+
+	switch (data->type) {
+	case FILETYPE_MEGAHAL8:
+		ret = write_data(data, SZ_32, data->dict_size);
+		if (ret) return ret;
+		break;
+
+	case FILETYPE_SQLHAL0:
+		break;
+
+	default:
+		BUG();
+	}
+
+	for (i = 0; i < data->dict_size; i++) {
+		length = strlen(data->dict_text[i]);
+		if (!fwrite(&length, sizeof(length), 1, data->fd)) return -EIO;
+		if (fwrite(data->dict_text[i], sizeof(char), length, data->fd) != length) return -EIO;
+	}
+
+	return OK;
+}
+
 int read_dict_size(void *data_, number_t size) {
 	save_t *data = data_;
+	int ret;
 	void *mem;
 
 	if ((data->dict_base + size) > UINT32_MAX || (data->dict_base + size) < data->dict_base)
 		return -ENOSPC;
+
+	if (data->type == FILETYPE_SQLHAL0) {
+		ret = write_data(data, SZ_64, data->dict_base + size);
+		if (ret) return ret;
+
+		ret = save_dict(data);
+		if (ret) return ret;
+	}
 
 	mem = realloc(data->dict_words, sizeof(word_t) * (data->dict_base + size));
 	if (mem == NULL) return -ENOMEM;
@@ -324,9 +362,14 @@ int read_dict_size(void *data_, number_t size) {
 	if (mem == NULL) return -ENOMEM;
 	data->dict_idx = mem;
 
-	mem = realloc(data->dict_text, sizeof(char *) * (data->dict_base + size));
-	if (mem == NULL) return -ENOMEM;
-	data->dict_text = mem;
+	if (data->type == FILETYPE_SQLHAL0) {
+		free(data->dict_text);
+		data->dict_text = NULL;
+	} else {
+		mem = realloc(data->dict_text, sizeof(char *) * (data->dict_base + size));
+		if (mem == NULL) return -ENOMEM;
+		data->dict_text = mem;
+	}
 
 	return OK;
 }
@@ -338,16 +381,21 @@ int read_dict_iter(void *data_, word_t word, number_t pos, const char *text) {
 
 	data->dict_words[data->dict_base + pos] = word;
 	data->dict_idx[data->dict_base + pos] = data->dict_size;
-	data->dict_text[data->dict_size] = strdup(text);
-	if ((data->dict_text)[data->dict_size] == NULL) return -ENOMEM;
+
+	if (data->type == FILETYPE_SQLHAL0) {
+		uint8_t length = strlen(text);
+		if (!fwrite(&length, sizeof(length), 1, data->fd)) return -EIO;
+		if (fwrite(text, sizeof(char), length, data->fd) != length) return -EIO;
+	} else {
+		data->dict_text[data->dict_size] = strdup(text);
+		if ((data->dict_text)[data->dict_size] == NULL) return -ENOMEM;
+	}
 
 	data->dict_size++;
 	return OK;
 }
 
-int read_dict(save_t *data) {
-	int ret;
-
+int init_dict(save_t *data) {
 	data->dict_size = 0;
 
 	data->dict_words = malloc(sizeof(word_t) * TOKENS);
@@ -370,39 +418,16 @@ int read_dict(save_t *data) {
 	data->dict_size = TOKENS;
 	data->dict_base = data->dict_size;
 
+	return OK;
+}
+
+int read_dict(save_t *data) {
+	int ret;
+
 	ret = db_model_dump_words(data->brain, read_dict_size, read_dict_iter, data);
 	if (ret) {
 		free_saved_dict(data);
 		return ret;
-	}
-
-	return OK;
-}
-
-int save_dict(save_t *data) {
-	int ret;
-	uint8_t length;
-	uint_fast32_t i;
-
-	switch (data->type) {
-	case FILETYPE_MEGAHAL8:
-		ret = write_data(data, SZ_32, data->dict_size);
-		if (ret) return ret;
-		break;
-
-	case FILETYPE_SQLHAL0:
-		ret = write_data(data, SZ_64, data->dict_size);
-		if (ret) return ret;
-		break;
-
-	default:
-		BUG();
-	}
-
-	for (i = 0; i < data->dict_size; i++) {
-		length = strlen(data->dict_text[i]);
-		if (!fwrite(&length, sizeof(length), 1, data->fd)) return -EIO;
-		if (fwrite(data->dict_text[i], sizeof(char), length, data->fd) != length) return -EIO;
 	}
 
 	return OK;
@@ -663,16 +688,19 @@ int save_brain(const char *name, enum file_type type, const char *filename) {
 	ret = db_model_get_root(data.brain, &forward, &backward);
 	if (ret) goto fail;
 
-	ret = read_dict(&data);
-	if (ret) goto fail;
-
-	log_info("save_brain", data.dict_size, "Dictionary read");
-
 	if (fwrite(cookie, sizeof(char), COOKIE_LEN, data.fd) != COOKIE_LEN) return -EIO;
 	if (!fwrite(&tmp8, sizeof(tmp8), 1, data.fd)) return -EIO;
 
+	ret = init_dict(&data);
+	if (ret) goto fail;
+
 	switch (data.type) {
 	case FILETYPE_MEGAHAL8:
+		ret = read_dict(&data);
+		if (ret) goto fail;
+
+		log_info("save_brain", data.dict_size, "Dictionary read");
+
 		ret = save_tree(&data, &forward); /* forward */
 		if (ret) goto fail;
 
@@ -690,7 +718,7 @@ int save_brain(const char *name, enum file_type type, const char *filename) {
 		break;
 
 	case FILETYPE_SQLHAL0:
-		ret = save_dict(&data);
+		ret = read_dict(&data);
 		if (ret) goto fail;
 
 		log_info("save_brain", data.dict_size, "Dictionary saved");
