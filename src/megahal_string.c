@@ -167,8 +167,52 @@ int megahal_parse(const char *string, list_t **words) {
 }
 
 int megahal_output(list_t *words, char **string) {
-	(void)words;
-	(void)string;
+	size_t len = 0;
+	uint_fast32_t i;
+	uint32_t size;
+	int ret;
+	void *mem;
 
-	BUG(); // TODO
+	WARN_IF(words == NULL);
+	WARN_IF(string == NULL);
+	WARN_IF(*string != NULL);
+
+	ret = list_size(words, &size);
+	if (ret) return ret;
+
+	*string = malloc(sizeof(char) * (len + 1));
+	if (*string == NULL) return -ENOMEM;
+	(*string)[0] = 0;
+
+	for (i = 0; i < size; i++) {
+		word_t ref;
+		size_t tmp_len;
+		char *tmp;
+
+		ret = list_get(words, i, &ref);
+		if (ret) return ret;
+
+		ret = db_word_str(ref, &tmp);
+		if (ret) return ret;
+
+		tmp_len = strlen(tmp);
+
+		mem = realloc(*string, sizeof(char) * (len + tmp_len + 1));
+		if (mem == NULL) {
+			free(*string);
+			*string = NULL;
+			free(tmp);
+			return -ENOMEM;
+		}
+		*string = mem;
+		(*string)[len + tmp_len] = 0;
+
+		strcat(&(*string)[len], tmp);
+		len += tmp_len;
+
+		free(tmp);
+	}
+
+	megahal_capitalise(*string);
+	return OK;
 }
