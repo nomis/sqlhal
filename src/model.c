@@ -45,6 +45,11 @@ typedef struct {
 } load_t;
 
 typedef struct {
+	word_t word;
+	uint32_t idx;
+} sdict_t;
+
+typedef struct {
 	brain_t brain;
 	number_t order;
 
@@ -53,8 +58,7 @@ typedef struct {
 
 	uint_fast32_t dict_size;
 	uint_fast32_t dict_base;
-	word_t *dict_words;
-	uint32_t *dict_idx;
+	sdict_t *dict_words;
 	char **dict_text;
 } save_t;
 
@@ -264,7 +268,7 @@ int load_dict(load_t *data) {
 				log_error("load_dict", i, "Invalid word (not " TOKEN_ERROR ")");
 				WARN();
 			}
-			(data->dict_words)[i] = 0;
+			data->dict_words[i] = 0;
 			break;
 
 		case TOKEN_FIN_IDX:
@@ -272,14 +276,14 @@ int load_dict(load_t *data) {
 				log_error("load_dict", i, "Invalid word (not " TOKEN_FIN ")");
 				WARN();
 			}
-			(data->dict_words)[i] = 0;
+			data->dict_words[i] = 0;
 			break;
 
 		default:
 			ret = db_word_use(tmp, &word);
 			if (ret) return ret;
 
-			(data->dict_words)[i] = word;
+			data->dict_words[i] = word;
 		}
 	}
 
@@ -302,12 +306,10 @@ void free_saved_dict(save_t *data) {
 	}
 
 	free(data->dict_words);
-	free(data->dict_idx);
 	free(data->dict_text);
 
 	data->dict_size = 0;
 	data->dict_words = NULL;
-	data->dict_idx = NULL;
 	data->dict_text = NULL;
 }
 
@@ -354,13 +356,9 @@ int read_dict_size(void *data_, number_t size) {
 		if (ret) return ret;
 	}
 
-	mem = realloc(data->dict_words, sizeof(word_t) * (data->dict_base + size));
+	mem = realloc(data->dict_words, sizeof(sdict_t) * (data->dict_base + size));
 	if (mem == NULL) return -ENOMEM;
 	data->dict_words = mem;
-
-	mem = realloc(data->dict_idx, sizeof(uint32_t) * (data->dict_base + size));
-	if (mem == NULL) return -ENOMEM;
-	data->dict_idx = mem;
 
 	if (data->type == FILETYPE_SQLHAL0) {
 		free(data->dict_text);
@@ -379,8 +377,8 @@ int read_dict_iter(void *data_, word_t word, number_t pos, const char *text) {
 
 	if (data->dict_size >= UINT32_MAX) return -ENOSPC;
 
-	data->dict_words[data->dict_base + pos] = word;
-	data->dict_idx[data->dict_base + pos] = data->dict_size;
+	data->dict_words[data->dict_base + pos].word = word;
+	data->dict_words[data->dict_base + pos].idx = data->dict_size;
 
 	if (data->type == FILETYPE_SQLHAL0) {
 		uint8_t length = strlen(text);
@@ -388,7 +386,7 @@ int read_dict_iter(void *data_, word_t word, number_t pos, const char *text) {
 		if (fwrite(text, sizeof(char), length, data->fd) != length) return -EIO;
 	} else {
 		data->dict_text[data->dict_size] = strdup(text);
-		if ((data->dict_text)[data->dict_size] == NULL) return -ENOMEM;
+		if (data->dict_text[data->dict_size] == NULL) return -ENOMEM;
 	}
 
 	data->dict_size++;
@@ -398,22 +396,19 @@ int read_dict_iter(void *data_, word_t word, number_t pos, const char *text) {
 int init_dict(save_t *data) {
 	data->dict_size = 0;
 
-	data->dict_words = malloc(sizeof(word_t) * TOKENS);
+	data->dict_words = malloc(sizeof(sdict_t) * TOKENS);
 	if (data->dict_words == NULL) return -ENOMEM;
-
-	data->dict_idx = malloc(sizeof(uint32_t) * TOKENS);
-	if (data->dict_idx == NULL) return -ENOMEM;
 
 	data->dict_text = malloc(sizeof(char *) * TOKENS);
 	if (data->dict_text == NULL) return -ENOMEM;
 
-	(data->dict_words)[TOKEN_ERROR_IDX] = 0;
-	(data->dict_idx)[TOKEN_ERROR_IDX] = TOKEN_ERROR_IDX;
-	(data->dict_text)[TOKEN_ERROR_IDX] = TOKEN_ERROR;
+	data->dict_words[TOKEN_ERROR_IDX].word = 0;
+	data->dict_words[TOKEN_ERROR_IDX].idx = TOKEN_ERROR_IDX;
+	data->dict_text[TOKEN_ERROR_IDX] = TOKEN_ERROR;
 
-	(data->dict_words)[TOKEN_FIN_IDX] = 0;
-	(data->dict_idx)[TOKEN_FIN_IDX] = TOKEN_FIN_IDX;
-	(data->dict_text)[TOKEN_FIN_IDX] = TOKEN_FIN;
+	data->dict_words[TOKEN_FIN_IDX].word = 0;
+	data->dict_words[TOKEN_FIN_IDX].idx = TOKEN_FIN_IDX;
+	data->dict_text[TOKEN_FIN_IDX] = TOKEN_FIN;
 
 	data->dict_size = TOKENS;
 	data->dict_base = data->dict_size;
@@ -443,12 +438,12 @@ int find_word(save_t *data, word_t word, uint32_t *symbol) {
 	while (1) {
 		pos = (min + max) / 2;
 
-		if (word == data->dict_words[pos]) {
+		if (word == data->dict_words[pos].word) {
 			BUG_IF(pos == TOKEN_ERROR_IDX);
 			BUG_IF(pos == TOKEN_FIN_IDX);
-			*symbol = data->dict_idx[pos];
+			*symbol = data->dict_words[pos].idx;
 			return OK;
-		} else if (word > data->dict_words[pos]) {
+		} else if (word > data->dict_words[pos].word) {
 			if (max == pos) {
 				log_error("find_word", word, "Word missing from dictionary");
 				return -ENOTFOUND;
