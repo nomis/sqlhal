@@ -62,14 +62,14 @@ typedef struct {
 	char **dict_text;
 } save_t;
 
-static inline enum size_type data_size(uint64_t data) {
+static enum size_type data_size(uint64_t data) {
 	if (data < UINT8_MAX) return SZ_8;
 	else if (data < UINT16_MAX) return SZ_16;
 	else if (data < UINT32_MAX) return SZ_32;
 	else return SZ_64;
 }
 
-static inline int write_data(save_t *data, enum size_type size, uint64_t value) {
+static int write_data(save_t *data, enum size_type size, uint64_t value) {
 	switch (size) {
 	case SZ_8: {
 			uint8_t tmp = value;
