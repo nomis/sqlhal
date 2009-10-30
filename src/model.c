@@ -396,7 +396,7 @@ int save_dict(save_t *data) {
 		break;
 
 	default:
-		break;
+		BUG();
 	}
 
 	for (i = 0; i < data->dict_size; i++) {
