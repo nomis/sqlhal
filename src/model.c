@@ -161,28 +161,75 @@ static int load_tree(load_t *data, db_tree *tree) {
 
 	switch (data->type) {
 	case FILETYPE_MEGAHAL8:
-		sizes = (SZ_16 << 6) | (SZ_32 << 4) | (SZ_16 << 2) | SZ_16;
+		ret = read_data(data, SZ_16, &symbol);
+		if (ret) return ret;
+
+		ret = read_data(data, SZ_32, &usage);
+		if (ret) return ret;
+
+		ret = read_data(data, SZ_16, &count);
+		if (ret) return ret;
+
+		ret = read_data(data, SZ_16, &branch);
+		if (ret) return ret;
 		break;
 
 	case FILETYPE_SQLHAL0:
 		if (!fread(&sizes, sizeof(sizes), 1, data->fd)) return -EIO;
+
+		ret = read_data(data, (sizes >> 6) & 3, &symbol);
+		if (ret) return ret;
+
+		/* FIN token implies no children or usage */
+		if (symbol == TOKEN_FIN_IDX) {
+			branch = 0;
+			usage = 0;
+
+			/* count stored in sizes byte */
+			if (((sizes >> 5) & 1) == 1) {
+				count = (sizes & 31) + 1;
+			} else {
+				ret = read_data(data, sizes & 3, &count);
+				if (ret) return ret;
+			}
+		} else {
+			ret = read_data(data, (sizes >> 4) & 3, &branch);
+			if (ret) return ret;
+
+			/* no branches implies no usage */
+			if (branch > 0) {
+				ret = read_data(data, (sizes >> 2) & 3, &usage);
+				if (ret) return ret;
+
+				/* ERROR token implies no count */
+				if (symbol != TOKEN_ERROR_IDX) {
+					ret = read_data(data, sizes & 3, &count);
+					if (ret) return ret;
+				} else {
+					count = 0;
+				}
+			} else {
+				usage = 0;
+
+				/* ERROR token implies no count */
+				if (symbol != TOKEN_ERROR_IDX) {
+					/* count stored in sizes byte */
+					if (((sizes >> 3) & 1) == 1) {
+						count = (sizes & 7) + 1;
+					} else {
+						ret = read_data(data, sizes & 3, &count);
+						if (ret) return ret;
+					}
+				} else {
+					count = 0;
+				}
+			}
+		}
 		break;
 
 	default:
 		BUG();
 	}
-
-	ret = read_data(data, (sizes >> 6) & 3, &symbol);
-	if (ret) return ret;
-
-	ret = read_data(data, (sizes >> 4) & 3, &usage);
-	if (ret) return ret;
-
-	ret = read_data(data, (sizes >> 2) & 3, &count);
-	if (ret) return ret;
-
-	ret = read_data(data, sizes & 3, &branch);
-	if (ret) return ret;
 
 	if (data->mode == LOAD_STORE) {
 		WARN_IF(data->dict_words == NULL);
@@ -236,11 +283,15 @@ static int load_dict(load_t *data) {
 	case FILETYPE_MEGAHAL8:
 		ret = read_data(data, SZ_32, &size);
 		if (ret) return ret;
+
+		i = 0;
 		break;
 
 	case FILETYPE_SQLHAL0:
 		ret = read_data(data, SZ_64, &size);
 		if (ret) return ret;
+
+		//i = TOKENS;
 		break;
 
 	default:
@@ -256,7 +307,12 @@ static int load_dict(load_t *data) {
 	data->dict_words = malloc(sizeof(word_t) * size);
 	if (data->dict_words == NULL) return -ENOMEM;
 
-	for (i = 0; i < data->dict_size; i++) {
+	if (data->type == FILETYPE_SQLHAL0) {
+		for (i = 0; i < TOKENS; i++)
+			data->dict_words[i] = 0;
+	}
+
+	for (; i < data->dict_size; i++) {
 		if (!fread(&length, sizeof(length), 1, data->fd)) return -EIO;
 
 		tmp[length] = 0;
@@ -325,7 +381,7 @@ static int save_dict(save_t *data) {
 		break;
 
 	case FILETYPE_SQLHAL0:
-		break;
+		BUG();
 
 	default:
 		BUG();
@@ -350,9 +406,6 @@ static int read_dict_size(void *data_, number_t size) {
 
 	if (data->type == FILETYPE_SQLHAL0) {
 		ret = write_data(data, SZ_64, data->dict_base + size);
-		if (ret) return ret;
-
-		ret = save_dict(data);
 		if (ret) return ret;
 	}
 
@@ -480,6 +533,8 @@ static int save_tree(save_t *data, db_tree **tree) {
 
 	if (tree_p->word == 0) {
 		if (tree_p->parent_id == 0) {
+			BUG_IF(tree_p->count != 0);
+
 			word = TOKEN_ERROR_IDX;
 		} else {
 			BUG_IF(tree_p->usage != 0);
@@ -517,23 +572,64 @@ static int save_tree(save_t *data, db_tree **tree) {
 
 	case FILETYPE_SQLHAL0: {
 			uint8_t sizes = (data_size(word) << 6)
-				| (data_size(tree_p->usage) << 4)
-				| (data_size(tree_p->count) << 2)
-				| data_size(tree_p->children);
+				| (data_size(tree_p->children) << 4)
+				| (data_size(tree_p->usage) << 2)
+				| data_size(tree_p->count);
+
+			if (tree_p->children == 0) {
+				BUG_IF(tree_p->usage != 0);
+
+				if (word == TOKEN_FIN_IDX) {
+					/* no children and 0 < count <= 32, store in sizes byte */
+					if (tree_p->count <= 32 && tree_p->count > 0) {
+						sizes = (sizes & 0xc0) | (1 << 5) | (tree_p->count - 1);
+					} else {
+						/* size of children should be 0 */
+						BUG_IF(((sizes >> 4) & 3) != 0);
+					}
+				} else {
+					/* no children and 0 < count <= 8, store in sizes byte */
+					if (tree_p->count <= 8 && tree_p->count > 0) {
+						sizes = (sizes & 0xf0) | (1 << 3) | (tree_p->count - 1);
+					} else {
+						/* size of usage should be 0 */
+						BUG_IF(((sizes >> 2) & 3) != 0);
+					}
+				}
+			}
 
 			if (!fwrite(&sizes, sizeof(sizes), 1, data->fd)) return -EIO;
 
 			ret = write_data(data, data_size(word), word);
 			if (ret) return ret;
 
-			ret = write_data(data, data_size(tree_p->usage), tree_p->usage);
-			if (ret) return ret;
+			/* FIN token implies no children or usage */
+			if (word != TOKEN_FIN_IDX) {
+				ret = write_data(data, data_size(tree_p->children), tree_p->children);
+				if (ret) return ret;
 
-			ret = write_data(data, data_size(tree_p->count), tree_p->count);
-			if (ret) return ret;
+				/* no children implies no usage */
+				if (tree_p->children > 0) {
+					ret = write_data(data, data_size(tree_p->usage), tree_p->usage);
+					if (ret) return ret;
+				}
+			}
 
-			ret = write_data(data, data_size(tree_p->children), tree_p->children);
-			if (ret) return ret;
+			if (word == TOKEN_ERROR_IDX) {
+				/* ERROR token implies no count */
+			} else if (word == TOKEN_FIN_IDX) {
+				/* no children and 0 < count <= 32, stored in sizes byte */
+				if (tree_p->children > 0 || tree_p->count > 32) {
+					ret = write_data(data, data_size(tree_p->count), tree_p->count);
+					if (ret) return ret;
+				}
+			} else {
+				/* no children and 0 < count <= 8, stored in sizes byte */
+				if (tree_p->children > 0 || tree_p->count > 8) {
+					ret = write_data(data, data_size(tree_p->count), tree_p->count);
+					if (ret) return ret;
+				}
+			}
 		}
 		break;
 
