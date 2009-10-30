@@ -9,7 +9,7 @@
 #include "megahal.h"
 #include "output.h"
 
-int input_file(const char *name, const char *filename) {
+static int input_file(const char *name, const char *filename) {
 	int ret = OK;
 	brain_t brain;
 

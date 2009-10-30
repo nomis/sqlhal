@@ -8,7 +8,7 @@
 #include "db.h"
 #include "megahal.h"
 
-int getreply_text(const char *name, const char *text, char **reply) {
+static int getreply_text(const char *name, const char *text, char **reply) {
 	int ret = OK;
 	brain_t brain;
 

@@ -11,7 +11,7 @@
 #include "megahal.h"
 #include "output.h"
 
-int megahal_learn(brain_t brain, list_t *input) {
+static int megahal_learn(brain_t brain, list_t *input) {
 	uint_fast32_t i;
 	uint32_t size;
 	number_t order;
@@ -89,7 +89,7 @@ fail:
 	return ret;
 }
 
-int megahal_reply(brain_t brain, list_t *input, list_t *output) {
+static int megahal_reply(brain_t brain, list_t *input, list_t *output) {
 	(void)brain;
 	(void)input;
 	(void)output;

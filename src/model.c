@@ -148,7 +148,7 @@ static inline int read_data(load_t *data, enum size_type size, uint64_t *value) 
 	return OK;
 }
 
-int load_tree(load_t *data, db_tree *tree) {
+static int load_tree(load_t *data, db_tree *tree) {
 	uint64_t symbol;
 	uint64_t usage;
 	uint64_t count;
@@ -224,7 +224,7 @@ int load_tree(load_t *data, db_tree *tree) {
 	return OK;
 }
 
-int load_dict(load_t *data) {
+static int load_dict(load_t *data) {
 	uint64_t size;
 	uint8_t length;
 	int ret;
@@ -290,14 +290,14 @@ int load_dict(load_t *data) {
 	return OK;
 }
 
-void free_loaded_dict(load_t *data) {
+static void free_loaded_dict(load_t *data) {
 	free(data->dict_words);
 
 	data->dict_size = 0;
 	data->dict_words = NULL;
 }
 
-void free_saved_dict(save_t *data) {
+static void free_saved_dict(save_t *data) {
 	uint_fast32_t i;
 
 	if (data->dict_text != NULL) {
@@ -313,7 +313,7 @@ void free_saved_dict(save_t *data) {
 	data->dict_text = NULL;
 }
 
-int save_dict(save_t *data) {
+static int save_dict(save_t *data) {
 	int ret;
 	uint8_t length;
 	uint_fast32_t i;
@@ -340,7 +340,7 @@ int save_dict(save_t *data) {
 	return OK;
 }
 
-int read_dict_size(void *data_, number_t size) {
+static int read_dict_size(void *data_, number_t size) {
 	save_t *data = data_;
 	int ret;
 	void *mem;
@@ -372,7 +372,7 @@ int read_dict_size(void *data_, number_t size) {
 	return OK;
 }
 
-int read_dict_iter(void *data_, word_t word, number_t pos, const char *text) {
+static int read_dict_iter(void *data_, word_t word, number_t pos, const char *text) {
 	save_t *data = data_;
 
 	if (data->dict_size >= UINT32_MAX) return -ENOSPC;
@@ -393,7 +393,7 @@ int read_dict_iter(void *data_, word_t word, number_t pos, const char *text) {
 	return OK;
 }
 
-int init_dict(save_t *data) {
+static int init_dict(save_t *data) {
 	data->dict_size = 0;
 
 	data->dict_words = malloc(sizeof(sdict_t) * TOKENS);
@@ -416,7 +416,7 @@ int init_dict(save_t *data) {
 	return OK;
 }
 
-int read_dict(save_t *data) {
+static int read_dict(save_t *data) {
 	int ret;
 
 	ret = db_model_dump_words(data->brain, read_dict_size, read_dict_iter, data);
@@ -428,7 +428,7 @@ int read_dict(save_t *data) {
 	return OK;
 }
 
-int find_word(save_t *data, word_t word, uint32_t *symbol) {
+static int find_word(save_t *data, word_t word, uint32_t *symbol) {
 	uint_fast32_t min = 0;
 	uint_fast32_t pos;
 	uint_fast32_t max = data->dict_size - 1;
@@ -459,7 +459,7 @@ int find_word(save_t *data, word_t word, uint32_t *symbol) {
 	}
 }
 
-int save_tree(save_t *data, db_tree **tree) {
+static int save_tree(save_t *data, db_tree **tree) {
 	db_tree *tree_p;
 	int ret;
 	uint32_t word;

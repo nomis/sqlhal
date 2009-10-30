@@ -8,7 +8,7 @@
 #include "db.h"
 #include "megahal.h"
 
-int hal_text(const char *name, const char *text, char **reply) {
+static int hal_text(const char *name, const char *text, char **reply) {
 	int ret = OK;
 	brain_t brain;
 

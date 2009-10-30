@@ -8,7 +8,7 @@
 #include "db.h"
 #include "megahal.h"
 
-int learn_text(const char *name, const char *text) {
+static int learn_text(const char *name, const char *text) {
 	int ret = OK;
 	brain_t brain;
 
