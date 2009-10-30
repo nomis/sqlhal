@@ -584,16 +584,16 @@ static int save_tree(save_t *data, db_tree **tree) {
 					if (tree_p->count <= 32 && tree_p->count > 0) {
 						sizes = (sizes & 0xc0) | (1 << 5) | (tree_p->count - 1);
 					} else {
-						/* size of children should be 0 */
-						BUG_IF(((sizes >> 4) & 3) != 0);
+						/* bit ((sizes >> 5) & 1) == 0 */
+						/* the only usable bits left here are (sizes >> 2) & 7 */
 					}
 				} else {
 					/* no children and 0 < count <= 8, store in sizes byte */
 					if (tree_p->count <= 8 && tree_p->count > 0) {
 						sizes = (sizes & 0xf0) | (1 << 3) | (tree_p->count - 1);
 					} else {
-						/* size of usage should be 0 */
-						BUG_IF(((sizes >> 2) & 3) != 0);
+						/* bit ((sizes >> 3) & 1) == 0 */
+						/* the only usable bit left here is (sizes >> 2) & 1 */
 					}
 				}
 			}
