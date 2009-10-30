@@ -429,22 +429,16 @@ int db_model_link(db_tree *parent, db_tree *child) {
 	return OK;
 }
 
-int db_model_dump_words(brain_t brain, uint_fast32_t *dict_size, word_t **dict_words, uint32_t **dict_idx, char ***dict_text) {
+int db_model_dump_words(brain_t brain, int (*allocate)(void *data, number_t size), int (*callback)(void *data, word_t word, number_t index, const char *text), void *data) {
 	PGresult *res;
 	unsigned int num, i;
-	uint_fast32_t base;
-	void *mem;
 	const char *param[1];
 	char tmp[1][32];
+	int ret;
 
 	WARN_IF(brain == 0);
-	WARN_IF(dict_size == NULL);
-	WARN_IF(dict_words == NULL);
-	WARN_IF(dict_idx == NULL);
-	WARN_IF(dict_text == NULL);
-	WARN_IF(*dict_words == NULL);
-	WARN_IF(*dict_idx == NULL);
-	WARN_IF(*dict_text == NULL);
+	WARN_IF(data == NULL);
+	WARN_IF(callback == NULL);
 	if (db_connect())
 		return -EDB;
 
@@ -453,23 +447,11 @@ int db_model_dump_words(brain_t brain, uint_fast32_t *dict_size, word_t **dict_w
 	res = PQexecPrepared(conn, "model_brain_words", 1, param, NULL, NULL, 0);
 	if (PQresultStatus(res) != PGRES_TUPLES_OK) goto fail;
 
-	base = *dict_size;
 	num = PQntuples(res);
-
-	if ((base + num) > UINT32_MAX || (base + num) < base)
-		return -ENOSPC;
-
-	mem = realloc(*dict_words, sizeof(word_t) * (base + num));
-	if (mem == NULL) { PQclear(res); return -ENOMEM; }
-	*dict_words = mem;
-
-	mem = realloc(*dict_idx, sizeof(uint32_t) * (base + num));
-	if (mem == NULL) { PQclear(res); return -ENOMEM; }
-	*dict_idx = mem;
-
-	mem = realloc(*dict_text, sizeof(char *) * (base + num));
-	if (mem == NULL) { PQclear(res); return -ENOMEM; }
-	*dict_text = mem;
+	if (allocate != NULL) {
+		ret = allocate(data, num);
+		if (ret) return ret;
+	}
 
 	for (i = 0; i < num; i++) {
 		word_t word;
@@ -481,29 +463,14 @@ int db_model_dump_words(brain_t brain, uint_fast32_t *dict_size, word_t **dict_w
 		text = PQgetvalue(res, i, 2);
 		if (text == NULL) goto fail;
 
-		(*dict_words)[base + pos] = word;
-		(*dict_idx)[base + pos] = *dict_size;
-		(*dict_text)[*dict_size] = strdup(text);
-		if ((*dict_text)[*dict_size] == NULL) {
+		ret = callback(data, word, pos, text);
+		if (ret) {
 			PQclear(res);
-			return -ENOMEM;
-		}
-
-		if (*dict_size >= UINT32_MAX) {
-			PQclear(res);
-			return -ENOSPC;
-		}
-
-		(*dict_size)++;
-
-		if (*dict_size <= 0) {
-			PQclear(res);
-			return -ENOSPC;
+			return ret;
 		}
 	}
 
 	PQclear(res);
-
 	return OK;
 
 fail:

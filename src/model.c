@@ -52,6 +52,7 @@ typedef struct {
 	enum file_type type;
 
 	uint_fast32_t dict_size;
+	uint_fast32_t dict_base;
 	word_t *dict_words;
 	uint32_t *dict_idx;
 	char **dict_text;
@@ -308,6 +309,42 @@ void free_saved_dict(save_t *data) {
 	data->dict_text = NULL;
 }
 
+int read_dict_size(void *data_, number_t size) {
+	save_t *data = data_;
+	void *mem;
+
+	if ((data->dict_base + size) > UINT32_MAX || (data->dict_base + size) < data->dict_base)
+		return -ENOSPC;
+
+	mem = realloc(data->dict_words, sizeof(word_t) * (data->dict_base + size));
+	if (mem == NULL) return -ENOMEM;
+	data->dict_words = mem;
+
+	mem = realloc(data->dict_idx, sizeof(uint32_t) * (data->dict_base + size));
+	if (mem == NULL) return -ENOMEM;
+	data->dict_idx = mem;
+
+	mem = realloc(data->dict_text, sizeof(char *) * (data->dict_base + size));
+	if (mem == NULL) return -ENOMEM;
+	data->dict_text = mem;
+
+	return OK;
+}
+
+int read_dict_iter(void *data_, word_t word, number_t pos, const char *text) {
+	save_t *data = data_;
+
+	if (data->dict_size >= UINT32_MAX) return -ENOSPC;
+
+	data->dict_words[data->dict_base + pos] = word;
+	data->dict_idx[data->dict_base + pos] = data->dict_size;
+	data->dict_text[data->dict_size] = strdup(text);
+	if ((data->dict_text)[data->dict_size] == NULL) return -ENOMEM;
+
+	data->dict_size++;
+	return OK;
+}
+
 int read_dict(save_t *data) {
 	int ret;
 
@@ -331,8 +368,9 @@ int read_dict(save_t *data) {
 	(data->dict_text)[TOKEN_FIN_IDX] = TOKEN_FIN;
 
 	data->dict_size = TOKENS;
+	data->dict_base = data->dict_size;
 
-	ret = db_model_dump_words(data->brain, &data->dict_size, &data->dict_words, &data->dict_idx, &data->dict_text);
+	ret = db_model_dump_words(data->brain, read_dict_size, read_dict_iter, data);
 	if (ret) {
 		free_saved_dict(data);
 		return ret;

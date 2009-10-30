@@ -18,13 +18,17 @@ int db_list_zap(brain_t brain, enum list type);                              /* 
 int db_list_add(brain_t brain, enum list type, word_t word);                 /* add word (does not exist) */
 int db_list_contains(brain_t brain, enum list type, word_t word);            /* return -ENOTFOUND if word does not exist */
 int db_list_del(brain_t brain, enum list type, word_t word);                 /* delete word (exists) */
-int db_list_iter(brain_t brain, enum list type, int (*callback)(void *data, word_t ref, const char *word), void *data); /* iterate through list */
+int db_list_iter(brain_t brain, enum list type,
+	int (*callback)(void *data, word_t ref, const char *word),
+	void *data);                                                           /* iterate through list */
 
 int db_map_zap(brain_t brain, enum map type);                                /* clears table */
 int db_map_get(brain_t brain, enum map type, word_t key, word_t *value);     /* return -ENOTFOUND if key does not exist */
 int db_map_put(brain_t brain, enum map type, word_t key, word_t value);      /* add key (does not exist) */
 int db_map_del(brain_t brain, enum map type, word_t key);                    /* delete key (exists) */
-int db_map_iter(brain_t brain, enum list type, int (*callback)(void *data, word_t key_ref, word_t key_value, const char *key, const char *value), void *data); /* iterate through map */
+int db_map_iter(brain_t brain, enum list type,
+	int (*callback)(void *data, word_t key_ref, word_t key_value, const char *key, const char *value),
+	void *data);                                                           /* iterate through map */
 
 typedef struct {
 	node_t id;
@@ -50,4 +54,7 @@ int db_model_node_fill(brain_t brain, db_tree *node);                        /* 
 int db_model_node_find(brain_t brain, db_tree *tree, word_t word, db_tree **found); /* find node */
 void db_model_node_free(db_tree **node);                                     /* free node data (recursively) */
 
-int db_model_dump_words(brain_t brain, uint_fast32_t *dict_size, word_t **dict_words, uint32_t **dict_idx, char ***dict_text);
+int db_model_dump_words(brain_t brain,
+	int (*allocate)(void *data, number_t size),
+	int (*callback)(void *data, word_t word, number_t pos, const char *text),
+	void *data);                                                           /* iterate through all words */
