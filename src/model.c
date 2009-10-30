@@ -243,7 +243,7 @@ int load_dict(load_t *data) {
 	}
 
 	if (size > UINT32_MAX) {
-		log_error("load_dict", i, "Cannot handle brains with more than 2^32-1 words");
+		log_error("load_dict", size, "Cannot handle brains with more than 2^32-1 words");
 		WARN();
 	}
 
