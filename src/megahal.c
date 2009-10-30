@@ -109,7 +109,6 @@ int megahal_process(brain_t brain, const char *input, char **output, uint8_t fla
 		tmp = strdup(input);
 		if (tmp == NULL) return -ENOMEM;
 
-		megahal_upper(tmp);
 		ret = megahal_parse(tmp, &words_in);
 		free(tmp);
 		if (ret) return ret;

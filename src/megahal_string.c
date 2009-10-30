@@ -10,7 +10,7 @@
 #include "db.h"
 #include "dict.h"
 
-void megahal_capitalise(char *string) {
+static void megahal_capitalise(char *string) {
 	size_t i, len;
 	int start = 1;
 
@@ -28,7 +28,7 @@ void megahal_capitalise(char *string) {
 	}
 }
 
-void megahal_upper(char *string) {
+static void megahal_upper(char *string) {
 	size_t i, len;
 
 	if (string == NULL) return;
@@ -39,7 +39,7 @@ void megahal_upper(char *string) {
 }
 
 /* Return whether or not a word boundary exists in a string at the specified location. */
-int boundary(const char *string, uint_fast32_t position, uint_fast32_t len) {
+static int boundary(const char *string, uint_fast32_t position, uint_fast32_t len) {
 	if (position == 0)
 		return 0;
 
@@ -112,6 +112,8 @@ int megahal_parse(const char *string, list_t **words) {
 			 */
 			tmp = strndup(string, offset);
 			if (tmp == NULL) return -ENOMEM;
+
+			megahal_upper(tmp);
 
 			ret = db_word_use(tmp, &ref);
 			free(tmp);
