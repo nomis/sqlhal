@@ -202,6 +202,7 @@ int db_model_node_find(brain_t brain, db_tree *tree, word_t word, db_tree **foun
 	PGresult *res;
 	const char *param[3];
 	char tmp[3][32];
+	int ret;
 	db_tree *found_p;
 
 	WARN_IF(brain == 0);
@@ -222,13 +223,18 @@ int db_model_node_find(brain_t brain, db_tree *tree, word_t word, db_tree **foun
 	if (PQresultStatus(res) != PGRES_TUPLES_OK) goto fail;
 	if (PQntuples(res) == 0) goto not_found;
 
-	if (*found != NULL)
-		db_model_node_free(found);
-
-	*found = db_model_node_alloc();
-	if (*found == NULL) {
-		PQclear(res);
-		return -ENOMEM;
+	if (*found != NULL) {
+		ret = db_model_node_clear(*found);
+		if (ret) {
+			PQclear(res);
+			return ret;
+		}
+	} else {
+		*found = db_model_node_alloc();
+		if (*found == NULL) {
+			PQclear(res);
+			return -ENOMEM;
+		}
 	}
 	found_p = *found;
 

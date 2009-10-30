@@ -49,6 +49,27 @@ db_tree *db_model_node_alloc(void) {
 	return node;
 }
 
+int db_model_node_clear(db_tree *node) {
+	number_t i;
+
+	BUG_IF(node == NULL);
+
+	node->id = 0;
+	node->parent_id = 0;
+	node->word = 0;
+	node->usage = 0;
+	node->count = 0;
+
+	for (i = 0; i < node->children; i++)
+		db_model_node_free((db_tree **)&node->nodes[i++]);
+	free(node->nodes);
+
+	node->children = 0;
+	node->nodes = NULL;
+
+	return OK;
+}
+
 void db_model_node_free(db_tree **node) {
 	db_tree *node_p;
 	number_t i;
