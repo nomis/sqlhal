@@ -54,6 +54,7 @@ int db_model_node_fill(brain_t brain, db_tree *node);                        /* 
 int db_model_node_find(brain_t brain, db_tree *tree, word_t word, db_tree **found); /* find node */
 int db_model_node_clear(db_tree *node);                                      /* clear data in node for re-use */
 void db_model_node_free(db_tree **node);                                     /* free node data (recursively) */
+int db_model_contains(brain_t brain, word_t word);                           /* return -ENOTFOUND if word does not exist in this brain's model */
 
 int db_model_dump_words(brain_t brain,
 	int (*allocate)(void *data, number_t size),

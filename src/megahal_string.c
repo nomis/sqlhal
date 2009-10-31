@@ -168,6 +168,94 @@ int megahal_parse(const char *string, list_t **words) {
 	return OK;
 }
 
+static int add_keyword(dict_t *keywords, word_t word) {
+	int ret;
+	char *tmp;
+
+	ret = db_word_str(word, &tmp);
+	if (ret) return ret;
+
+	if (isalnum((unsigned char)tmp[0]) != 0)
+		ret = dict_add(keywords, word, NULL);
+
+	free(tmp);
+	return ret;
+}
+
+int megahal_keywords(brain_t brain, list_t *words, dict_t **keywords) {
+	dict_t *keywords_p;
+	uint_fast32_t i;
+	uint32_t size;
+	int ret;
+
+	WARN_IF(words == NULL);
+	WARN_IF(keywords == NULL);
+
+	*keywords = dict_alloc();
+	if (*keywords == NULL) return -ENOMEM;
+	keywords_p = *keywords;
+
+	ret = list_size(words, &size);
+	if (ret) return ret;
+
+	for (i = 0; i < size; i++) {
+		word_t word;
+
+		ret = list_get(words, i, &word);
+		if (ret) return ret;
+
+		ret = db_map_get(brain, MAP_SWAP, word, &word);
+		if (ret != OK && ret != -ENOTFOUND) return ret;
+
+		ret = db_list_contains(brain, LIST_BAN, word);
+		if (ret == OK) continue;
+		if (ret != -ENOTFOUND) return ret;
+
+		ret = db_list_contains(brain, LIST_AUX, word);
+		if (ret == OK) continue;
+		if (ret != -ENOTFOUND) return ret;
+
+		ret = db_model_contains(brain, word);
+		if (ret == -ENOTFOUND) continue;
+		if (ret != OK) return ret;
+
+		ret = add_keyword(keywords_p, word);
+		if (ret) return ret;
+	}
+
+	ret = dict_size(keywords_p, &size);
+	if (ret) return ret;
+
+	if (size == 0)
+		return OK;
+
+	ret = list_size(words, &size);
+	if (ret) return ret;
+
+	for (i = 0; i < size; i++) {
+		word_t word;
+
+		ret = list_get(words, i, &word);
+		if (ret) return ret;
+
+		ret = db_map_get(brain, MAP_SWAP, word, &word);
+		if (ret != OK && ret != -ENOTFOUND) return ret;
+
+		ret = db_list_contains(brain, LIST_AUX, word);
+		if (ret == -ENOTFOUND) continue;
+		if (ret != OK) return ret;
+
+		ret = db_model_contains(brain, word);
+		if (ret == -ENOTFOUND) continue;
+		if (ret != OK) return ret;
+
+		ret = add_keyword(keywords_p, word);
+		if (ret) return ret;
+	}
+
+	return OK;
+}
+
 int megahal_output(list_t *words, char **string) {
 	size_t len = 0;
 	uint_fast32_t i;

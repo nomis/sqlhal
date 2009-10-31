@@ -5,4 +5,5 @@ int megahal_process(brain_t brain, const char *input, char **output, uint8_t fla
 int megahal_train(brain_t brain, const char *filename);
 
 int megahal_parse(const char *string, list_t **words);
+int megahal_keywords(brain_t brain, list_t *words, dict_t **keywords);
 int megahal_output(list_t *words, char **string);

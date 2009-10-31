@@ -435,6 +435,36 @@ int db_model_link(db_tree *parent, db_tree *child) {
 	return OK;
 }
 
+int db_model_contains(brain_t brain, word_t word) {
+	PGresult *res;
+	const char *param[2];
+	char tmp[2][32];
+
+	WARN_IF(brain == 0);
+	WARN_IF(word == 0);
+	if (db_connect())
+		return -EDB;
+
+	SET_PARAM(param, tmp, 0, brain);
+	SET_PARAM(param, tmp, 1, word);
+
+	res = PQexecPrepared(conn, "model_word_exists", 2, param, NULL, NULL, 0);
+	if (PQresultStatus(res) != PGRES_TUPLES_OK) goto fail;
+	if (PQntuples(res) == 0) goto not_found;
+
+	PQclear(res);
+	return OK;
+
+fail:
+	log_error("db_model_contains", PQresultStatus(res), PQresultErrorMessage(res));
+	PQclear(res);
+	return -EDB;
+
+not_found:
+	PQclear(res);
+	return -ENOTFOUND;
+}
+
 int db_model_dump_words(brain_t brain, int (*allocate)(void *data, number_t size), int (*callback)(void *data, word_t word, number_t index, const char *text), void *data) {
 	PGresult *res;
 	unsigned int num, i;

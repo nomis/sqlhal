@@ -90,9 +90,12 @@ fail:
 }
 
 static int megahal_reply(brain_t brain, list_t *input, list_t *output) {
-	(void)brain;
-	(void)input;
+	dict_t *keywords;
+	int ret;
 	(void)output;
+
+	ret = megahal_keywords(brain, input, &keywords);
+	if (ret) return ret;
 
 	BUG(); // TODO
 }
