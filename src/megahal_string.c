@@ -85,7 +85,7 @@ int megahal_parse(const char *string, list_t **words) {
 	list_t *words_p;
 	uint_fast32_t offset, len;
 	uint32_t size;
-	word_t ref;
+	word_t word;
 	char *tmp;
 	int ret;
 
@@ -115,11 +115,11 @@ int megahal_parse(const char *string, list_t **words) {
 
 			megahal_upper(tmp);
 
-			ret = db_word_use(tmp, &ref);
+			ret = db_word_use(tmp, &word);
 			free(tmp);
 			if (ret) return ret;
 
-			ret = list_append(words_p, ref);
+			ret = list_append(words_p, word);
 			if (ret) return ret;
 
 			if (offset == len) break;
@@ -139,27 +139,27 @@ int megahal_parse(const char *string, list_t **words) {
 	ret = list_size(words_p, &size);
 	if (ret) return ret;
 
-	ret = list_get(words_p, size - 1, &ref);
+	ret = list_get(words_p, size - 1, &word);
 	if (ret) return ret;
 
-	ret = db_word_str(ref, &tmp);
+	ret = db_word_str(word, &tmp);
 	if (ret) return ret;
 
 	if (isalnum((unsigned char)tmp[0])) {
 		free(tmp);
 
-		ret = db_word_use(".", &ref);
+		ret = db_word_use(".", &word);
 		if (ret) return ret;
 
-		ret = list_append(words_p, ref);
+		ret = list_append(words_p, word);
 		if (ret) return ret;
 	} else if (strchr("!.?", (unsigned char)tmp[strlen(tmp) - 1]) == NULL) {
 		free(tmp);
 
-		ret = db_word_use(".", &ref);
+		ret = db_word_use(".", &word);
 		if (ret) return ret;
 
-		ret = list_set(words_p, size - 1, ref);
+		ret = list_set(words_p, size - 1, word);
 		if (ret) return ret;
 	} else {
 		free(tmp);
@@ -187,14 +187,14 @@ int megahal_output(list_t *words, char **string) {
 	(*string)[0] = 0;
 
 	for (i = 0; i < size; i++) {
-		word_t ref;
+		word_t word;
 		size_t tmp_len;
 		char *tmp;
 
-		ret = list_get(words, i, &ref);
+		ret = list_get(words, i, &word);
 		if (ret) return ret;
 
-		ret = db_word_str(ref, &tmp);
+		ret = db_word_str(word, &tmp);
 		if (ret) return ret;
 
 		tmp_len = strlen(tmp);
