@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include "types.h"
 #include "err.h"
@@ -89,22 +90,66 @@ fail:
 	return ret;
 }
 
-static int megahal_reply(brain_t brain, list_t *input, list_t *output) {
-	dict_t *keywords;
+static int megahal_timeout(struct timespec start) {
+	struct timespec now;
+	int64_t timeout = MEGAHAL_TIMEOUT_NS;
 	int ret;
-	(void)output;
+
+	ret = clock_gettime(CLOCK_MONOTONIC, &now);
+	if (ret) return 1;
+
+	timeout -= (now.tv_sec - start.tv_sec) * 1000000000 + (now.tv_nsec - start.tv_nsec);
+	return timeout <= 0;
+}
+
+static int megahal_reply(brain_t brain, list_t *input, list_t **output) {
+	dict_t *keywords;
+	list_t *current;
+	struct timespec start;
+	double surprise;
+	double max_surprise;
+	int ret;
+
+	*output = NULL;
 
 	ret = megahal_keywords(brain, input, &keywords);
 	if (ret) return ret;
 
-	BUG(); // TODO
+	ret = megahal_generate(brain, NULL, output);
+	if (ret) return ret;
+
+	if (!list_equal(input, *output))
+		list_free(output);
+
+	ret = clock_gettime(CLOCK_MONOTONIC, &start);
+	if (ret) return -ECLOCK;
+
+	max_surprise = -1.0;
+	do {
+		ret = megahal_generate(brain, keywords, &current);
+		if (ret) return ret;
+
+		ret = megahal_evaluate(brain, keywords, current, &surprise);
+		if (ret) {
+			list_free(&current);
+			return ret;
+		}
+
+		if (surprise > max_surprise && !list_equal(input, current)) {
+			max_surprise = surprise;
+			list_free(output);
+			*output = current;
+		} else {
+			list_free(&current);
+		}
+	} while(!megahal_timeout(start));
+
+	return OK;
 }
 
 int megahal_process(brain_t brain, const char *input, char **output, uint8_t flags) {
 	list_t *words_in;
 	int ret;
-
-	printf("megahal_process %ld, %s, %p, %d\n", brain, input, output, flags);
 
 	if (input != NULL) {
 		char *tmp;
@@ -134,28 +179,21 @@ int megahal_process(brain_t brain, const char *input, char **output, uint8_t fla
 
 		if (words_in == NULL) BUG(); // TODO
 
-		words_out = list_alloc();
+		ret = megahal_reply(brain, words_in, &words_out);
+		list_free(&words_in);
+		if (ret) return ret;
+
 		if (words_out == NULL) {
-			list_free(&words_in);
-			return -ENOMEM;
-		}
-
-		ret = megahal_reply(brain, words_in, words_out);
-		if (ret) {
-			list_free(&words_in);
+			*output = strdup("I don't know enough to answer you yet!");
+			if (*output == NULL) return -ENOMEM;
+		} else {
+			ret = megahal_output(words_out, output);
 			list_free(&words_out);
-			return ret;
+			if (ret) return ret;
 		}
-
-		ret = megahal_output(words_out, output);
-		list_free(&words_out);
-		if (ret) {
-			list_free(&words_in);
-			return ret;
-		}
+	} else {
+		list_free(&words_in);
 	}
-
-	list_free(&words_in);
 	return OK;
 }
 

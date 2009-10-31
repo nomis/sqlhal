@@ -1,6 +1,6 @@
 CFLAGS += -g -O0
 override CFLAGS += -Wall -Wextra -Wshadow -Werror
-LDLIBS += -lpq
+LDLIBS += -lpq -lrt
 
 DB=postgres
 STD_H=err.h types.h
@@ -11,7 +11,7 @@ clean:
 	rm -f *.o $(BIN)
 
 DB_OBJS=db.o db_conn_$(DB).o db_brain_$(DB).o db_word_$(DB).o db_list_$(DB).o db_map_$(DB).o db_model_$(DB).o
-MH_OBJS=megahal.o megahal_string.o dict.o model.o
+MH_OBJS=megahal.o megahal_string.o megahal_reply.o dict.o model.o
 
 BRAIN=brain.o dict.o model.o console.o $(DB_OBJS)
 brain: $(BRAIN)
@@ -45,7 +45,8 @@ db_word_postgres.o: db.h db_postgres.h $(STD_H)
 db_list_postgres.o: db.h db_postgres.h $(STD_H)
 db_map_postgres.o: db.h db_postgres.h $(STD_H)
 db_model_postgres.o: db.h db_postgres.h $(STD_H)
-megahal.o: dict.h model.h db.h $(STD_H)
-megahal_string.o: dict.h db.h $(STD_H)
+megahal.o: dict.h megahal.h model.h db.h $(STD_H)
+megahal_string.o: dict.h megahal.h model.h db.h $(STD_H)
+megahal_reply.o: dict.h megahal.h model.h db.h $(STD_H)
 model.o: db.h model.h $(STD_H)
 quiet.o: output.h

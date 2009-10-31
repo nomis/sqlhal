@@ -8,6 +8,7 @@
 #define EFAULT 5
 #define ENOMEM 6
 #define ENOSPC 7
+#define ECLOCK 8
 
 #ifdef NDEBUG
 # define WARN_IF(expr) do { if (expr) return -EINVAL; } while(0)

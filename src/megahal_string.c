@@ -9,6 +9,7 @@
 #include "err.h"
 #include "db.h"
 #include "dict.h"
+#include "megahal.h"
 
 static void megahal_capitalise(char *string) {
 	size_t i, len;
@@ -182,7 +183,7 @@ static int add_keyword(dict_t *keywords, word_t word) {
 	return ret;
 }
 
-int megahal_keywords(brain_t brain, list_t *words, dict_t **keywords) {
+int megahal_keywords(brain_t brain, const list_t *words, dict_t **keywords) {
 	dict_t *keywords_p;
 	uint_fast32_t i;
 	uint32_t size;
@@ -256,7 +257,7 @@ int megahal_keywords(brain_t brain, list_t *words, dict_t **keywords) {
 	return OK;
 }
 
-int megahal_output(list_t *words, char **string) {
+int megahal_output(const list_t *words, char **string) {
 	size_t len = 0;
 	uint_fast32_t i;
 	uint32_t size;

@@ -295,14 +295,14 @@ int dict_del(dict_t *dict, word_t word, uint32_t *pos) {
 	return OK;
 }
 
-int dict_size(dict_t *dict, uint32_t *size) {
+int dict_size(const dict_t *dict, uint32_t *size) {
 	WARN_IF(dict == NULL);
 	WARN_IF(size == NULL);
 	*size = dict->size;
 	return OK;
 }
 
-int dict_find(dict_t *dict, word_t word, uint32_t *pos) {
+int dict_find(const dict_t *dict, word_t word, uint32_t *pos) {
 	uint_fast32_t min = 0;
 	uint_fast32_t tmp;
 	uint_fast32_t max;
@@ -415,7 +415,7 @@ int list_prepend(list_t *list, word_t word) {
 	return OK;
 }
 
-int list_get(list_t *list, uint32_t pos, word_t *word) {
+int list_get(const list_t *list, uint32_t pos, word_t *word) {
 	WARN_IF(list == NULL);
 	WARN_IF(word == NULL);
 	if (pos >= list->size) return -ENOTFOUND;
@@ -431,11 +431,27 @@ int list_set(list_t *list, uint32_t pos, word_t word) {
 	return OK;
 }
 
-int list_size(list_t *list, uint32_t *size) {
+int list_size(const list_t *list, uint32_t *size) {
 	WARN_IF(list == NULL);
 	WARN_IF(size == NULL);
 	*size = list->size;
 	return OK;
+}
+
+int list_equal(const list_t *a, const list_t *b) {
+	uint_fast32_t i;
+
+	WARN_IF(a == NULL);
+	WARN_IF(b == NULL);
+
+	if (a->size != b->size)
+		return 0;
+
+	for (i = 0; i < a->size; i++)
+		if (a->words[i] != b->words[i])
+			return 0;
+
+	return 1;
 }
 
 void list_free(list_t **list) {
@@ -448,3 +464,4 @@ void list_free(list_t **list) {
 	free(*list);
 	*list = NULL;
 }
+
