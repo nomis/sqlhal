@@ -116,24 +116,27 @@ static int megahal_reply(brain_t brain, list_t *input, list_t **output) {
 	if (ret) return ret;
 
 	ret = megahal_generate(brain, NULL, output);
-	if (ret) return ret;
+	if (ret) {
+		dict_free(&keywords);
+		return ret;
+	}
 
 	if (!list_equal(input, *output))
 		list_free(output);
 
 	ret = clock_gettime(CLOCK_MONOTONIC, &start);
-	if (ret) return -ECLOCK;
+	if (ret) {
+			ret = -ECLOCK;
+			goto fail;
+	}
 
 	max_surprise = -1.0;
 	do {
 		ret = megahal_generate(brain, keywords, &current);
-		if (ret) return ret;
+		if (ret) goto fail;
 
 		ret = megahal_evaluate(brain, keywords, current, &surprise);
-		if (ret) {
-			list_free(&current);
-			return ret;
-		}
+		if (ret) goto fail;
 
 		if (surprise > max_surprise && !list_equal(input, current)) {
 			max_surprise = surprise;
@@ -144,7 +147,14 @@ static int megahal_reply(brain_t brain, list_t *input, list_t **output) {
 		}
 	} while(!megahal_timeout(start));
 
+	dict_free(&keywords);
+
 	return OK;
+
+fail:
+	list_free(output);
+	dict_free(&keywords);
+	return ret;
 }
 
 int megahal_process(brain_t brain, const char *input, char **output, uint8_t flags) {
