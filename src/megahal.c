@@ -37,7 +37,7 @@ static int megahal_learn(brain_t brain, list_t *input) {
 	 * the context of the model.
 	 */
 	ret = model_init(model, MODEL_FORWARD);
-	if (ret) return ret;
+	if (ret) goto fail;
 
 	for (i = 0; i < size; i++) {
 		word_t word;
@@ -62,7 +62,7 @@ static int megahal_learn(brain_t brain, list_t *input) {
 	 * the context of the model.
 	 */
 	ret = model_init(model, MODEL_BACKWARD);
-	if (ret) return ret;
+	if (ret) goto fail;
 
 	for (i = 0; i < size; i++) {
 		word_t word;
