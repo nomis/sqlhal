@@ -311,6 +311,11 @@ int dict_find(dict_t *dict, word_t word, uint32_t *pos) {
 	WARN_IF(dict == NULL);
 	WARN_IF(word == 0);
 
+	if (dict->size == 0) {
+		if (pos != NULL)
+			*pos = 0;
+		return -ENOTFOUND;
+	}
 	max = dict->size - 1;
 
 	while (1) {
