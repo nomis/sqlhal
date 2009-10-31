@@ -295,6 +295,14 @@ int dict_del(dict_t *dict, word_t word, uint32_t *pos) {
 	return OK;
 }
 
+int dict_get(const dict_t *dict, uint32_t pos, word_t *word) {
+	WARN_IF(dict == NULL);
+	WARN_IF(word == NULL);
+	if (pos >= dict->size) return -ENOTFOUND;
+	*word = dict->words[pos];
+	return OK;
+}
+
 int dict_size(const dict_t *dict, uint32_t *size) {
 	WARN_IF(dict == NULL);
 	WARN_IF(size == NULL);
@@ -452,6 +460,18 @@ int list_equal(const list_t *a, const list_t *b) {
 			return 0;
 
 	return 1;
+}
+
+int list_contains(const list_t *list, word_t word) {
+	uint_fast32_t i;
+
+	WARN_IF(list == NULL);
+
+	for (i = 0; i < list->size; i++)
+		if (list->words[i] == word)
+			return OK;
+
+	return -ENOTFOUND;
 }
 
 void list_free(list_t **list) {

@@ -305,7 +305,42 @@ int db_connect(void) {
 			if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
 			PQclear(res);
 
-			res = PQprepare(conn, "model_word_exists", "SELECT id FROM nodes WHERE brain = $1 AND word = $2 LIMIT 1", 2, NULL);
+			res = PQprepare(conn, "model_word_exists", "SELECT word FROM nodes WHERE brain = $1 AND word = $2 LIMIT 1", 2, NULL);
+			if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
+			PQclear(res);
+
+			res = PQprepare(conn, "model_word_random", "SELECT word FROM nodes WHERE brain = $1 AND parent = $2"\
+				" ORDER BY random() LIMIT 1", 2, NULL);
+			if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
+			PQclear(res);
+
+			res = PQprepare(conn, "model_node_random", "SELECT id, word, usage, count FROM nodes"\
+				" WHERE brain = $1 AND parent = $2"\
+				" ORDER BY random() LIMIT 1", 2, NULL);
+			if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
+			PQclear(res);
+
+			res = PQprepare(conn, "model_node_first", "SELECT id, parent, word, usage, count FROM nodes"\
+				" WHERE brain = $1 AND parent = $2"\
+				" ORDER BY id LIMIT 1", 2, NULL);
+			if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
+			PQclear(res);
+
+			res = PQprepare(conn, "model_node_prev", "SELECT id, parent, word, usage, count FROM nodes"\
+				" WHERE brain = $1 AND parent = $2 AND id < $3"\
+				" ORDER BY id DESC LIMIT 1", 3, NULL);
+			if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
+			PQclear(res);
+
+			res = PQprepare(conn, "model_node_next", "SELECT id, parent, word, usage, count FROM nodes"\
+				" WHERE brain = $1 AND parent = $2 AND id > $3"\
+				" ORDER BY id LIMIT 1", 3, NULL);
+			if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
+			PQclear(res);
+
+			res = PQprepare(conn, "model_node_last", "SELECT id, parent, word, usage, count FROM nodes"\
+				" WHERE brain = $1 AND parent = $2"\
+				" ORDER BY id DESC LIMIT 1", 2, NULL);
 			if (PQresultStatus(res) != PGRES_COMMAND_OK) goto fail;
 			PQclear(res);
 
@@ -436,6 +471,24 @@ int db_disconnect(void) {
 	PQclear(res);
 
 	res = PQexec(conn, "DEALLOCATE PREPARE model_word_exists");
+	PQclear(res);
+
+	res = PQexec(conn, "DEALLOCATE PREPARE model_word_random");
+	PQclear(res);
+
+	res = PQexec(conn, "DEALLOCATE PREPARE model_node_random");
+	PQclear(res);
+
+	res = PQexec(conn, "DEALLOCATE PREPARE model_node_first");
+	PQclear(res);
+
+	res = PQexec(conn, "DEALLOCATE PREPARE model_node_prev");
+	PQclear(res);
+
+	res = PQexec(conn, "DEALLOCATE PREPARE model_node_next");
+	PQclear(res);
+
+	res = PQexec(conn, "DEALLOCATE PREPARE model_node_last");
 	PQclear(res);
 
 	res = PQexec(conn, "DEALLOCATE PREPARE model_brain_words");

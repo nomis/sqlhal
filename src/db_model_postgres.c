@@ -465,6 +465,148 @@ not_found:
 	return -ENOTFOUND;
 }
 
+int db_model_rand_word(brain_t brain, const db_tree *node, word_t *word) {
+	PGresult *res;
+	const char *param[2];
+	char tmp[2][32];
+
+	WARN_IF(brain == 0);
+	WARN_IF(node == NULL);
+	WARN_IF(node->id == 0);
+	if (db_connect())
+		return -EDB;
+
+	SET_PARAM(param, tmp, 0, brain);
+	SET_PARAM(param, tmp, 1, node->id);
+
+	res = PQexecPrepared(conn, "model_word_random", 2, param, NULL, NULL, 0);
+	if (PQresultStatus(res) != PGRES_TUPLES_OK) goto fail;
+	if (PQntuples(res) == 0) goto not_found;
+
+	GET_VALUE(res, 0, 0, *word);
+
+	PQclear(res);
+	return OK;
+
+fail:
+	log_error("db_model_rand_word", PQresultStatus(res), PQresultErrorMessage(res));
+	PQclear(res);
+	return -EDB;
+
+not_found:
+	PQclear(res);
+	return -ENOTFOUND;
+}
+
+int db_model_rand_node(brain_t brain, const db_tree *parent, db_tree **node) {
+	PGresult *res;
+	const char *param[2];
+	char tmp[2][32];
+	db_tree *node_p;
+
+	WARN_IF(brain == 0);
+	WARN_IF(parent == NULL);
+	WARN_IF(parent->id == 0);
+	WARN_IF(node == NULL);
+	if (db_connect())
+		return -EDB;
+
+	SET_PARAM(param, tmp, 0, brain);
+	SET_PARAM(param, tmp, 1, parent->id);
+
+	res = PQexecPrepared(conn, "model_node_random", 2, param, NULL, NULL, 0);
+	if (PQresultStatus(res) != PGRES_TUPLES_OK) goto fail;
+	if (PQntuples(res) == 0) goto not_found;
+
+	*node = db_model_node_alloc();
+	if (*node == NULL) {
+		PQclear(res);
+		return -ENOMEM;
+	}
+	node_p = *node;
+
+	node_p->parent_id = parent->id;
+	GET_VALUE(res, 0, 0, node_p->id);
+	GET_VALUE(res, 0, 1, node_p->word);
+	GET_VALUE(res, 0, 2, node_p->usage);
+	GET_VALUE(res, 0, 3, node_p->count);
+
+	PQclear(res);
+	return OK;
+
+fail:
+	log_error("db_model_rand_node", PQresultStatus(res), PQresultErrorMessage(res));
+	PQclear(res);
+	return -EDB;
+
+not_found:
+	PQclear(res);
+	return -ENOTFOUND;
+}
+
+int db_model_next_node(brain_t brain, const db_tree *current, db_tree **next) {
+	PGresult *res;
+	const char *param[3];
+	char tmp[3][32];
+	db_tree *node_p;
+	int ret;
+
+	WARN_IF(brain == 0);
+	WARN_IF(current == NULL);
+	WARN_IF(current->id == 0);
+	WARN_IF(current->parent_id == 0);
+	WARN_IF(next == NULL);
+	if (db_connect())
+		return -EDB;
+
+	SET_PARAM(param, tmp, 0, brain);
+	SET_PARAM(param, tmp, 1, current->parent_id);
+	SET_PARAM(param, tmp, 2, current->id);
+
+	res = PQexecPrepared(conn, "model_node_next", 3, param, NULL, NULL, 0);
+	if (PQresultStatus(res) != PGRES_TUPLES_OK) goto fail;
+	if (PQntuples(res) == 0) {
+		PQclear(res);
+
+		res = PQexecPrepared(conn, "model_node_first", 2, param, NULL, NULL, 0);
+		if (PQresultStatus(res) != PGRES_TUPLES_OK) goto fail;
+		if (PQntuples(res) == 0) goto not_found;
+	}
+
+	if (*next != NULL) {
+		ret = db_model_node_clear(*next);
+		if (ret) {
+			PQclear(res);
+			return ret;
+		}
+	} else {
+		*next = db_model_node_alloc();
+		if (*next == NULL) {
+			PQclear(res);
+			return -ENOMEM;
+		}
+	}
+	node_p = *next;
+
+	GET_VALUE(res, 0, 0, node_p->id);
+	GET_VALUE(res, 0, 1, node_p->parent_id);
+	GET_VALUE(res, 0, 2, node_p->word);
+	GET_VALUE(res, 0, 3, node_p->usage);
+	GET_VALUE(res, 0, 4, node_p->count);
+
+	PQclear(res);
+	return OK;
+
+fail:
+	log_error("db_model_next_node", PQresultStatus(res), PQresultErrorMessage(res));
+	PQclear(res);
+	return -EDB;
+
+not_found:
+	PQclear(res);
+	return -ENOTFOUND;
+}
+
 int db_model_dump_words(brain_t brain, int (*allocate)(void *data, number_t size), int (*callback)(void *data, word_t word, number_t index, const char *text), void *data) {
 	PGresult *res;
 	unsigned int num, i;

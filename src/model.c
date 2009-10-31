@@ -971,6 +971,89 @@ int model_update(model_t *model, word_t word, int persist) {
 	return OK;
 }
 
+int model_rand_word(const model_t *model, word_t *word) {
+	BUG_IF(model == NULL);
+	BUG_IF(model->contexts[0] == NULL);
+
+	return db_model_rand_word(model->brain, model->contexts[0], word);
+}
+
+int model_rand_init(const model_t *model, model_rand_t *state) {
+	uint_fast32_t i;
+	db_tree *context;
+	int ret;
+
+	BUG_IF(model == NULL);
+	BUG_IF(state == NULL);
+
+	state->brain = 0;
+	state->node = NULL;
+
+	/*
+	 * Select the longest available context.
+	 */
+	context = NULL;
+	for (i = 0; i <= model->order; i++)
+		if (model->contexts[i] != NULL)
+			context = model->contexts[i];
+
+	if (context == NULL)
+		return -ENOTFOUND;
+
+	ret = db_model_rand_node(model->brain, context, &state->node);
+	if (ret) return ret;
+
+	state->brain = model->brain;
+	state->count = random() % context->usage;
+	return OK;
+}
+
+int model_rand_next(model_rand_t *state, word_t *word) {
+	int ret;
+
+	BUG_IF(state == NULL);
+	BUG_IF(state->brain == 0);
+
+	if (state->node == NULL) {
+		return -ENOTFOUND;
+	}
+
+	while (state->node->word == 0 && state->count > 0) {
+		ret = db_model_next_node(state->brain, state->node, &state->node);
+		if (ret == -ENOTFOUND) {
+			db_model_node_free(&state->node);
+
+			return -ENOTFOUND;
+		} else if (ret == OK) {
+			if (state->node->count > state->count) {
+				state->count = 0;
+			} else {
+				state->count -= state->node->count;
+			}
+		} else {
+			return ret;
+		}
+	}
+
+	if (state->node->word == 0) {
+		db_model_node_free(&state->node);
+		return -ENOTFOUND;
+	}
+
+	*word = state->node->word;
+	state->node->word = 0;
+
+	if (state->count == 0)
+		db_model_node_free(&state->node);
+
+	return OK;
+}
+
+void model_rand_free(model_rand_t *state) {
+	if (state == NULL) return;
+	db_model_node_free(&state->node);
+}
+
 void model_free(model_t **model) {
 	model_t *model_p;
 	uint_fast32_t i;
