@@ -263,7 +263,7 @@ int dict_add(dict_t *dict, word_t word, uint32_t *pos) {
 	if (mem == NULL) { dict->size--; return -ENOMEM; }
 	dict->words = mem;
 
-	for (i = *pos + 1; i < dict->size; i++)
+	for (i = dict->size - 1; i > *pos; i--)
 		dict->words[i] = dict->words[i - 1];
 	dict->words[*pos] = word;
 
