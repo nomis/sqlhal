@@ -188,6 +188,12 @@ static int load_tree(load_t *data, db_tree *tree) {
 			/* count stored in sizes byte */
 			if (((sizes >> 5) & 1) == 1) {
 				count = (sizes & 31) + 1;
+			} else if (((sizes >> 4) & 1) == 1) {
+				count = (sizes & 15) + 33;
+			} else if (((sizes >> 3) & 1) == 1) {
+				count = (sizes & 7) + 49;
+			} else if (((sizes >> 2) & 1) == 1) {
+				count = (sizes & 3) + 57;
 			} else {
 				ret = read_data(data, sizes & 3, &count);
 				if (ret) return ret;
@@ -216,6 +222,8 @@ static int load_tree(load_t *data, db_tree *tree) {
 					/* count stored in sizes byte */
 					if (((sizes >> 3) & 1) == 1) {
 						count = (sizes & 7) + 1;
+					} else if (((sizes >> 2) & 1) == 1) {
+						count = (sizes & 3) + 9;
 					} else {
 						ret = read_data(data, sizes & 3, &count);
 						if (ret) return ret;
@@ -583,17 +591,33 @@ static int save_tree(save_t *data, db_tree **tree) {
 					/* no children and 0 < count <= 32, store in sizes byte */
 					if (tree_p->count <= 32 && tree_p->count > 0) {
 						sizes = (sizes & 0xc0) | (1 << 5) | (tree_p->count - 1);
+
+					/* no children and 0 < count <= 48, store in sizes byte */
+					} else if (tree_p->count <= 48 && tree_p->count > 0) {
+						sizes = (sizes & 0xc0) | (1 << 4) | (tree_p->count - 33);
+
+					/* no children and 0 < count <= 56, store in sizes byte */
+					} else if (tree_p->count <= 56 && tree_p->count > 0) {
+						sizes = (sizes & 0xc0) | (1 << 3) | (tree_p->count - 49);
+
+					/* no children and 0 < count <= 60, store in sizes byte */
+					} else if (tree_p->count <= 60 && tree_p->count > 0) {
+						sizes = (sizes & 0xc0) | (1 << 2) | (tree_p->count - 57);
+
 					} else {
-						/* bit ((sizes >> 5) & 1) == 0 */
-						/* the only usable bits left here are (sizes >> 2) & 7 */
+						/* bits ((sizes >> 2) & 7) == 0 */
 					}
 				} else {
 					/* no children and 0 < count <= 8, store in sizes byte */
 					if (tree_p->count <= 8 && tree_p->count > 0) {
 						sizes = (sizes & 0xf0) | (1 << 3) | (tree_p->count - 1);
+
+					/* no children and 0 < count <= 12, store in sizes byte */
+					} else if (tree_p->count <= 12 && tree_p->count > 0) {
+						sizes = (sizes & 0xf0) | (1 << 2) | (tree_p->count - 9);
+
 					} else {
-						/* bit ((sizes >> 3) & 1) == 0 */
-						/* the only usable bit left here is (sizes >> 2) & 1 */
+						/* bits ((sizes >> 4) & 3) == 0 */
 					}
 				}
 			}
@@ -624,8 +648,8 @@ static int save_tree(save_t *data, db_tree **tree) {
 					if (ret) return ret;
 				}
 			} else {
-				/* no children and 0 < count <= 8, stored in sizes byte */
-				if (tree_p->children > 0 || tree_p->count > 8) {
+				/* no children and 0 < count <= 12, stored in sizes byte */
+				if (tree_p->children > 0 || tree_p->count > 12) {
 					ret = write_data(data, data_size(tree_p->count), tree_p->count);
 					if (ret) return ret;
 				}
