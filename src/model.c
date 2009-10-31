@@ -379,7 +379,8 @@ static void free_saved_dict(save_t *data) {
 
 static int save_dict(save_t *data) {
 	int ret;
-	uint8_t length;
+	size_t len;
+	uint8_t tmp8;
 	uint_fast32_t i;
 
 	switch (data->type) {
@@ -396,9 +397,11 @@ static int save_dict(save_t *data) {
 	}
 
 	for (i = 0; i < data->dict_size; i++) {
-		length = strlen(data->dict_text[i]);
-		if (!fwrite(&length, sizeof(length), 1, data->fd)) return -EIO;
-		if (fwrite(data->dict_text[i], sizeof(char), length, data->fd) != length) return -EIO;
+		len = strlen(data->dict_text[i]);
+		if (len > UINT8_MAX) return -ENOSPC;
+		tmp8 = len;
+		if (!fwrite(&tmp8, sizeof(tmp8), 1, data->fd)) return -EIO;
+		if (fwrite(data->dict_text[i], sizeof(char), len, data->fd) != len) return -EIO;
 	}
 
 	return OK;

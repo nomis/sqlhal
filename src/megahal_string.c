@@ -114,6 +114,12 @@ int megahal_parse(const char *string, list_t **words) {
 			tmp = strndup(string, offset);
 			if (tmp == NULL) return -ENOMEM;
 
+			/*
+			 * Truncate overly long words because they won't fit in the
+			 * dictionary when saving.
+			 */
+			if (offset > UINT8_MAX)
+				tmp[UINT8_MAX + 1] = 0;
 			megahal_upper(tmp);
 
 			ret = db_word_use(tmp, &word);
