@@ -223,7 +223,7 @@ int megahal_train(brain_t brain, const char *filename) {
 		if (buffer[0] == '#') continue;
 		string = strtok(buffer, "\r\n");
 
-		if (strlen(string) > 0) {
+		if (string && strlen(string) > 0) {
 			ret = megahal_process(brain, buffer, NULL, MEGAHAL_F_LEARN);
 			if (ret) goto fail;
 		}
